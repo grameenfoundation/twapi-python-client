@@ -1,6 +1,6 @@
 import pandas as pd
 import xlsxwriter
-from shared_utilities import get_pandas_dataframe_from_json_web_call, get_version_changelog_from_form_name, upload_payload_to_url
+from lib.shared_utilities import get_pandas_dataframe_from_json_web_call, get_version_changelog_from_form_name, upload_payload_to_url
 
 
 def get_all_dataframes_and_write_to_excel_from_form_name(url_to_query,salesforce_service_url,auth_header,form_name_to_download):

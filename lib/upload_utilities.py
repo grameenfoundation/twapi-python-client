@@ -3,8 +3,9 @@ import json
 from types import SimpleNamespace
 import pandas as pd
 from urllib.parse import quote
-from shared_utilities import get_pandas_dataframe_from_json_web_call, get_version_changelog_from_form_name, upload_payload_to_url
-
+from lib.shared_utilities import get_pandas_dataframe_from_json_web_call, get_version_changelog_from_form_name, upload_payload_to_url
+import xlsxwriter
+import openpyxl
 
 """## Read excel file"""
 
@@ -21,7 +22,7 @@ def func_read_excel_file_and_upload(url_to_query,salesforce_service_url,auth_hea
 
         form_result, form_name_to_upload = func_upload_form(url_to_query,salesforce_service_url,auth_header,upload_form_dataframe)
         existing_questions_lookup, existing_options_lookup, questions_without_options = func_fetch_existing_questions(url_to_query,salesforce_service_url,auth_header,form_name_to_upload)
-        questions_result = func_upload_questions_with_options(url_to_query,salesforce_service_url,auth_header,form_name_to_upload,upload_options, upload_questions_without_options, existing_options_lookup, existing_questions_lookup, form_name_to_upload)
+        questions_result = func_upload_questions_with_options(url_to_query,salesforce_service_url,auth_header,form_name_to_upload,upload_options, upload_questions_without_options, existing_options_lookup, existing_questions_lookup)
         question_id_lookup = func_fetch_back_uploaded_questions(url_to_query,salesforce_service_url,auth_header,form_name_to_upload)
         upload_skip_logic_referencing_new_ids, field_mapping_referencing_new_ids, question_mapping_referencing_new_ids = func_update_dependent_objects_from_spreadsheet(url_to_query,salesforce_service_url,auth_header,upload_question_mapping, question_id_lookup, upload_field_mapping_no_question_mapping, upload_skip_logic)
         field_mapping_without_questions, question_mapping_dataframe = func_read_existing_field_and_form_mappings(url_to_query,salesforce_service_url,auth_header,form_name_to_upload)
@@ -29,7 +30,7 @@ def func_read_excel_file_and_upload(url_to_query,salesforce_service_url,auth_hea
         upload_orm_with_replaced_id = func_read_back_field_and_form_mapping_ids(url_to_query,salesforce_service_url,auth_header,form_name_to_upload, upload_orm)
         orm_result = func_upsert_orm(url_to_query,salesforce_service_url,auth_header,form_name_to_upload, upload_orm_with_replaced_id)
         skip_logic_result = func_upload_skip_logic(url_to_query,salesforce_service_url,auth_header,form_name_to_upload, upload_skip_logic_referencing_new_ids)
-        func_print_all_statuses_after_upload(url_to_query,salesforce_service_url,auth_header,form_result, questions_result, form_mapping_result, orm_result, skip_logic_result)        
+        func_print_all_statuses_after_upload(form_result, questions_result, form_mapping_result, orm_result, skip_logic_result)        
 
 
 """## Form"""
@@ -39,7 +40,7 @@ def func_upload_form(url_to_query,salesforce_service_url,auth_header,upload_form
         upload_form_dataframe_relevant_columns = upload_form_dataframe[['name','alias','messageAfterSubmission','description']].fillna("")
         form_name_to_upload = str(upload_form_dataframe_relevant_columns.name[0])
         # Fetch latest form ID and changelog from the API
-        form_version_id, changelog_number, form_id, form_external_id, form_dataframe = get_version_changelog_from_form_name(url_to_query,salesforce_service_url,auth_header,url_to_query,salesforce_service_url,auth_header,form_name_to_upload)
+        form_version_id, changelog_number, form_id, form_external_id, form_dataframe = get_version_changelog_from_form_name(url_to_query,salesforce_service_url,auth_header,form_name_to_upload)
 
         upload_form_dataframe_relevant_columns
 
@@ -68,13 +69,12 @@ def func_upload_form(url_to_query,salesforce_service_url,auth_header,upload_form
         upload_str = str(upload_form_dataframe_relevant_columns.T.astype(str).to_json(force_ascii=False)).replace('{"0":','{"records":[')[:-2] + ',' + formVersionString + '}]}'
         print(upload_str)
         form_update_endpoint = salesforce_service_url + 'formdata/v1?objectType=PutFormData'
-        payload = upload_str
-        form_result = upload_payload_to_url(form_update_endpoint, upload_str)
+        form_result = upload_payload_to_url(url_to_query,salesforce_service_url,auth_header,form_update_endpoint, upload_str)
         return form_result, form_name_to_upload
 """## Fetch existing Questions"""
 
 def func_fetch_existing_questions(url_to_query,salesforce_service_url,auth_header,form_name_to_upload):
-        form_version_id, changelog_number, form_id, form_external_id, form_dataframe = get_version_changelog_from_form_name(url_to_query,salesforce_service_url,auth_header,url_to_query,salesforce_service_url,auth_header,form_name_to_upload)
+        form_version_id, changelog_number, form_id, form_external_id, form_dataframe = get_version_changelog_from_form_name(url_to_query,salesforce_service_url,auth_header,form_name_to_upload)
 
         # First read in all known questions + options for this form into dataframes
         question_endpoint = salesforce_service_url + "questiondata/v1?objectType=GetQuestionData&formVersionId=" + form_version_id
@@ -94,6 +94,8 @@ def func_fetch_existing_questions(url_to_query,salesforce_service_url,auth_heade
         for index, frame in question_dataframe.iterrows():
             if (frame.options):
                 questionId = frame.id
+            else:
+                questionId = None
             individual_option_df = pd.read_json(str(frame.options).replace('\'','"'))
             individual_option_df['questionId'] = questionId
             options_dataframe = pd.concat([individual_option_df,options_dataframe])
@@ -133,7 +135,7 @@ def func_upload_questions_with_options(url_to_query,salesforce_service_url,auth_
             upload_options_sanitized = upload_options_sanitized.merge(existing_options_lookup[['id','name']],how="left",on="name").fillna("")
 
             # Fetch latest form ID and changelog from the API
-            form_version_id, changelog_number, form_id, form_external_id, form_dataframe = get_version_changelog_from_form_name(url_to_query,salesforce_service_url,auth_header,url_to_query,salesforce_service_url,auth_header,form_name_to_upload)
+            form_version_id, changelog_number, form_id, form_external_id, form_dataframe = get_version_changelog_from_form_name(url_to_query,salesforce_service_url,auth_header,form_name_to_upload)
 
             #Convert options df back into nested json
             options_associated_with_questions = upload_options['questionName'].drop_duplicates()
@@ -146,15 +148,14 @@ def func_upload_questions_with_options(url_to_query,salesforce_service_url,auth_
 
             upload_questions_with_options = upload_questions_with_options.merge(existing_questions_lookup[['id','name']],how="left",on="name").fillna('')
 
-            upload_questions_with_options
-
-            for questionName in options_associated_with_questions.iteritems():
-                thisQuestionName = questionName[1]
-                upload_options_json = str(upload_options_sanitized[upload_options_sanitized['questionName'] == thisQuestionName][['externalId','id','name','position','caption']].to_json(orient='records',force_ascii=False))
-                print(upload_options_json)
-                row_index = upload_questions_with_options.index[upload_questions_with_options['name'] == thisQuestionName ].tolist()[0]
-                print(row_index)
-                upload_questions_with_options.at[row_index,'options']= upload_options_json
+            if (not options_associated_with_questions.empty):
+                for questionName in options_associated_with_questions.iteritems():
+                    thisQuestionName = questionName[1]
+                    upload_options_json = str(upload_options_sanitized[upload_options_sanitized['questionName'] == thisQuestionName][['externalId','id','name','position','caption']].to_json(orient='records',force_ascii=False))
+                    print(upload_options_json)
+                    row_index = upload_questions_with_options.index[upload_questions_with_options['name'] == thisQuestionName ].tolist()[0]
+                    print(row_index)
+                    upload_questions_with_options.at[row_index,'options']= upload_options_json
 
             upload_questions_with_options = upload_questions_with_options.merge( \
                     existing_questions_lookup[['id','name']].rename(columns={'id':'parentId','name':'parentName'}),
@@ -187,12 +188,12 @@ def func_upload_questions_with_options(url_to_query,salesforce_service_url,auth_
                 'changeLogNumber', 'options']].to_json(orient="records",force_ascii=False)).replace('\\','').replace('"[{"','[{"').replace('"}]"','"}]').replace(',"options":""',',"options":[]').replace('null','""') + '}'
             # question_with_options_creation_string
 
-            questions_result = upload_payload_to_url(salesforce_service_url + 'questiondata/v1?objectType=PutQuestionData', question_with_options_creation_string)
+            questions_result = upload_payload_to_url(url_to_query,salesforce_service_url,auth_header,salesforce_service_url + 'questiondata/v1?objectType=PutQuestionData', question_with_options_creation_string)
             return questions_result
 """## Read Back Questions and update any relevant IDs"""
 
 def func_fetch_back_uploaded_questions(url_to_query,salesforce_service_url,auth_header,form_name_to_upload):
-        form_version_id, changelog_number, form_id, form_external_id, form_dataframe = get_version_changelog_from_form_name(url_to_query,salesforce_service_url,auth_header,url_to_query,salesforce_service_url,auth_header,form_name_to_upload)
+        form_version_id, changelog_number, form_id, form_external_id, form_dataframe = get_version_changelog_from_form_name(url_to_query,salesforce_service_url,auth_header,form_name_to_upload)
 
         question_endpoint = salesforce_service_url + "questiondata/v1?objectType=GetQuestionData&formVersionId=" + form_version_id
         questions_after_upload = get_pandas_dataframe_from_json_web_call(url_to_query,salesforce_service_url,question_endpoint, auth_header)
@@ -256,7 +257,7 @@ def func_read_existing_field_and_form_mappings(url_to_query,salesforce_service_u
 
 def func_upload_field_and_form_mappings(url_to_query,salesforce_service_url,auth_header,form_name_to_upload, question_mapping_referencing_new_ids, field_mapping_referencing_new_ids, question_mapping_dataframe, field_mapping_without_questions):
 
-        form_version_id, changelog_number, form_id, form_external_id, form_dataframe = get_version_changelog_from_form_name(url_to_query,salesforce_service_url,auth_header,url_to_query,salesforce_service_url,auth_header,form_name_to_upload)
+        form_version_id, changelog_number, form_id, form_external_id, form_dataframe = get_version_changelog_from_form_name(url_to_query,salesforce_service_url,auth_header,form_name_to_upload)
 
         #Convert options df back into nested json
         question_mapping_associated_with_field_mapping = question_mapping_referencing_new_ids['fieldMappingName'].drop_duplicates()
@@ -275,15 +276,15 @@ def func_upload_field_and_form_mappings(url_to_query,salesforce_service_url,auth
             question_mapping_referencing_new_ids['externalId'] = question_mapping_referencing_new_ids['name']
 
         upload_question_mapping_with_ids = question_mapping_referencing_new_ids.merge(question_mapping_dataframe[['name','id']],how="left",on="name")
-
-        for field_mapping_name in question_mapping_associated_with_field_mapping.iteritems():
-            thisFieldMapping = field_mapping_name[1]
-            print(thisFieldMapping)
-            upload_question_mapping_json = str(upload_question_mapping_with_ids[upload_question_mapping_with_ids['fieldMappingName'] == thisFieldMapping][['externalId', 'name', 'id', 'fieldAPIName', 'isBroken','question', 'scoringGroup']].to_json(orient='records',force_ascii=False))
-            print(upload_question_mapping_json)
-            row_index = upload_field_mapping_with_question_mapping.index[upload_field_mapping_with_question_mapping['name'] == thisFieldMapping ].tolist()[0]
-            print(row_index)
-            upload_field_mapping_with_question_mapping.at[row_index,'questionMappings']= upload_question_mapping_json
+        if (not question_mapping_associated_with_field_mapping.empty):
+            for field_mapping_name in question_mapping_associated_with_field_mapping.iteritems():
+                thisFieldMapping = field_mapping_name[1]
+                print(thisFieldMapping)
+                upload_question_mapping_json = str(upload_question_mapping_with_ids[upload_question_mapping_with_ids['fieldMappingName'] == thisFieldMapping][['externalId', 'name', 'id', 'fieldAPIName', 'isBroken','question', 'scoringGroup']].to_json(orient='records',force_ascii=False))
+                print(upload_question_mapping_json)
+                row_index = upload_field_mapping_with_question_mapping.index[upload_field_mapping_with_question_mapping['name'] == thisFieldMapping ].tolist()[0]
+                print(row_index)
+                upload_field_mapping_with_question_mapping.at[row_index,'questionMappings']= upload_question_mapping_json
 
         upload_field_mapping_with_question_mapping['form'] = form_id
         upload_field_mapping_with_question_mapping['formVersion'] = form_version_id
@@ -304,13 +305,13 @@ def func_upload_field_and_form_mappings(url_to_query,salesforce_service_url,auth
         if (upload_field_mapping_with_question_mapping.empty):
             form_mapping_result = "No Form Mapping to upload"
         else:
-            form_mapping_result = upload_payload_to_url(salesforce_service_url + 'formmappingdata/v1?objectType=PutFormMappingData', upload_field_mapping_string)
+            form_mapping_result = upload_payload_to_url(url_to_query,salesforce_service_url,auth_header,salesforce_service_url + 'formmappingdata/v1?objectType=PutFormMappingData', upload_field_mapping_string)
 
         return form_mapping_result
 """## Read back field and form mapping IDs, update ORM IDs"""
 
 def func_read_back_field_and_form_mapping_ids(url_to_query,salesforce_service_url,auth_header,form_name_to_upload, upload_orm):
-        form_version_id, changelog_number, form_id, form_external_id, form_dataframe = get_version_changelog_from_form_name(url_to_query,salesforce_service_url,auth_header,url_to_query,salesforce_service_url,auth_header,form_name_to_upload)
+        form_version_id, changelog_number, form_id, form_external_id, form_dataframe = get_version_changelog_from_form_name(url_to_query,salesforce_service_url,auth_header,form_name_to_upload)
 
         field_mapping_endpoint = salesforce_service_url + "formmappingdata/v1?objectType=GetFormMappingData&formVersionId=" + form_version_id
         field_mapping_after_upload_dataframe = pd.DataFrame(columns = ["externalId","id" ,"name" ,"form" ,"formVersion" ,"formVersionMappingField" ,"mobileUserField" ,"patScoreMappingField" ,"objectApiName" ,"formMappingField" ,"intervieweeMapField" ,"isReference" ,"matchingField" ,"repeat" ,"useAsInterviewee" ,"submissionAPIField" ,"changeLogNumber" ,"questionMappings" ])
@@ -331,7 +332,7 @@ def func_read_back_field_and_form_mapping_ids(url_to_query,salesforce_service_ur
 
 def func_upsert_orm(url_to_query,salesforce_service_url,auth_header,form_name_to_upload, upload_orm_with_replaced_id):
         # Fetch latest form ID and changelog from the API
-        form_version_id, changelog_number, form_id, form_external_id, form_dataframe = get_version_changelog_from_form_name(url_to_query,salesforce_service_url,auth_header,url_to_query,salesforce_service_url,auth_header,form_name_to_upload)
+        form_version_id, changelog_number, form_id, form_external_id, form_dataframe = get_version_changelog_from_form_name(url_to_query,salesforce_service_url,auth_header,form_name_to_upload)
 
         #Fetch existing ORM
         orm_endpoint = salesforce_service_url + "questiondata/v1?objectType=GetObjectRelationshipMappingData&formVersionId=" + form_version_id
@@ -353,7 +354,7 @@ def func_upsert_orm(url_to_query,salesforce_service_url,auth_header,form_name_to
         if (upload_orm.empty):
             orm_result = "No ORM to Upload"
         else:
-            orm_result = upload_payload_to_url(orm_update_endpoint, string_to_upload)
+            orm_result = upload_payload_to_url(url_to_query,salesforce_service_url,auth_header,orm_update_endpoint, string_to_upload)
 
         return orm_result
 
@@ -361,7 +362,7 @@ def func_upsert_orm(url_to_query,salesforce_service_url,auth_header,form_name_to
 
 def func_upload_skip_logic(url_to_query,salesforce_service_url,auth_header,form_name_to_upload, upload_skip_logic_referencing_new_ids):
         # Fetch latest form ID and changelog from the API
-        form_version_id, changelog_number, form_id, form_external_id, form_dataframe = get_version_changelog_from_form_name(url_to_query,salesforce_service_url,auth_header,url_to_query,salesforce_service_url,auth_header,form_name_to_upload)
+        form_version_id, changelog_number, form_id, form_external_id, form_dataframe = get_version_changelog_from_form_name(url_to_query,salesforce_service_url,auth_header,form_name_to_upload)
 
         #Fetch existing Skip Logic
         skip_logic_endpoint = salesforce_service_url + "questiondata/v1?objectType=GetSkipLogicData&formVersionId=" + form_version_id
@@ -394,7 +395,7 @@ def func_upload_skip_logic(url_to_query,salesforce_service_url,auth_header,form_
         if (upload_skip_logic.empty):
             skip_logic_result = "No Skip Logic to Upload"
         else:
-            skip_logic_result = upload_payload_to_url(form_update_endpoint, string_to_upload)
+            skip_logic_result = upload_payload_to_url(url_to_query,salesforce_service_url,auth_header,form_update_endpoint, string_to_upload)
 
         return skip_logic_result
 """# Review any errors"""
