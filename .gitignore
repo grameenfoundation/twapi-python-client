@@ -1,1 +1,4 @@
 colab_source/*
+lib/__pycache__/*
+tmp/
+env/
