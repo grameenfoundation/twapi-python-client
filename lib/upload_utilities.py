@@ -1,5 +1,4 @@
-import http.client
-import json
+import os
 from types import SimpleNamespace
 import pandas as pd
 from urllib.parse import quote
@@ -411,3 +410,10 @@ def func_print_all_statuses_after_upload(form_result, questions_result, form_map
 
     # NOTE: Bug IDALMSA-12051 causes the API to return "Skip Condition created successfully" when the API has actually updated instead of created. Low priority to fix as this doesn't break anything.
      print(skip_logic_result)
+
+def upload_all_files_in_folder(url_to_query,salesforce_service_url,auth_header,workingDirectory):
+    for filename in os.listdir(workingDirectory):
+        f = os.path.join(workingDirectory, filename)
+        if os.path.isfile(f):
+            print(f)
+            func_read_excel_file_and_upload(url_to_query,salesforce_service_url,auth_header,workingDirectory, filename)

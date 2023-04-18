@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import pandas as pd
 from urllib.parse import quote
 
-def get_oauth_token_from_login(url_to_query,salesforce_service_url, client_id, client_secret, username, password):
+def get_oauth_token_from_login(url_to_query, client_id, client_secret, username, password):
     conn = http.client.HTTPSConnection(url_to_query)
     payload = ''
     headers = {}

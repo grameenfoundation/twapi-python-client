@@ -1,7 +1,9 @@
 import sys
 import os
 
-from lib.upload_utilities import func_read_excel_file_and_upload
+import lib.upload_utilities
+
+from lib.upload_utilities import upload_all_files_in_folder
 print(sys.argv[1]) 
 print(sys.argv[2]) 
 print(sys.argv[3])
@@ -12,15 +14,11 @@ salesforce_service_url = sys.argv[2]
 auth_header = "OAuth " + sys.argv[3]
 workingDirectory = sys.argv[4]
 
-for filename in os.listdir(workingDirectory):
-    f = os.path.join(workingDirectory, filename)
-    # checking if it is a file
-    if os.path.isfile(f):
-        print(f)
-        func_read_excel_file_and_upload(url_to_query,salesforce_service_url,auth_header,workingDirectory, filename)
+upload_all_files_in_folder(url_to_query,salesforce_service_url,auth_header,workingDirectory)
+
 
 # Call With
-# > python3 upload_all_forms.py org_url auth_header
+# > python3 upload_all_forms.py org_url auth_header workingDir
 
 # For Example:
 
