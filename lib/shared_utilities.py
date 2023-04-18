@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import pandas as pd
 from urllib.parse import quote
 
-def get_oauth_token_from_login(url_to_query, client_id, client_secret, username, password):
+def get_oauth_token_from_login(url_to_query,salesforce_service_url, client_id, client_secret, username, password):
     conn = http.client.HTTPSConnection(url_to_query)
     payload = ''
     headers = {}
@@ -20,10 +20,10 @@ def get_oauth_token_from_login(url_to_query, client_id, client_secret, username,
     print(data_obj)
     return "OAuth " + data_obj.access_token
 
-def get_version_changelog_from_form_name(url_to_query,auth_header,form_name):
+def get_version_changelog_from_form_name(url_to_query,salesforce_service_url,auth_header,form_name):
     form_name_urlsafe = quote(form_name, safe='/')
-    form_endpoint = "/services/apexrest/formdata/v1?objectType=GetFormData&name=" + form_name_urlsafe
-    form_dataframe = get_pandas_dataframe_from_json_web_call(url_to_query,form_endpoint,auth_header)
+    form_endpoint = salesforce_service_url + "formdata/v1?objectType=GetFormData&name=" + form_name_urlsafe
+    form_dataframe = get_pandas_dataframe_from_json_web_call(url_to_query,salesforce_service_url,form_endpoint,auth_header)
     try:
       form_id = form_dataframe.id[0]
       form_external_id = form_dataframe.externalId[0]
@@ -39,7 +39,7 @@ def get_version_changelog_from_form_name(url_to_query,auth_header,form_name):
     print('Form Version ID: ',form_version_id, ' Form ID: ', form_id, ' Changelog: ', changelog_number, ' externalID: ',form_external_id)
     return form_version_id, changelog_number, form_id, form_external_id, form_dataframe
 
-def get_pandas_dataframe_from_json_web_call(url_to_query, endpoint_to_hit, auth_header):
+def get_pandas_dataframe_from_json_web_call(url_to_query,salesforce_service_url, endpoint_to_hit, auth_header):
     conn = http.client.HTTPSConnection(url_to_query)
     payload = ''
     headers = {
@@ -54,7 +54,7 @@ def get_pandas_dataframe_from_json_web_call(url_to_query, endpoint_to_hit, auth_
     records_dataframe = pd.json_normalize(data_obj, record_path =['records'])
     return records_dataframe
 
-def upload_payload_to_url(url_to_query, auth_header, endpoint_to_upload, payload):
+def upload_payload_to_url(url_to_query,salesforce_service_url, auth_header, endpoint_to_upload, payload):
       conn = http.client.HTTPSConnection(url_to_query)
       headers = {
         'Authorization': auth_header,

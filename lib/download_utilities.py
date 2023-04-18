@@ -2,10 +2,10 @@ import pandas as pd
 from shared_utilities import get_pandas_dataframe_from_json_web_call, get_version_changelog_from_form_name, upload_payload_to_url
 
 
-def get_all_dataframes_and_write_to_excel_from_form_name(url_to_query,auth_header,form_name_to_download):
-    form_version_id, changelog_number, form_id, form_external_id, form_dataframe = get_version_changelog_from_form_name(url_to_query,auth_header,url_to_query,auth_header,form_name_to_download)
+def get_all_dataframes_and_write_to_excel_from_form_name(url_to_query,salesforce_service_url,auth_header,form_name_to_download):
+    form_version_id, changelog_number, form_id, form_external_id, form_dataframe = get_version_changelog_from_form_name(url_to_query,salesforce_service_url,auth_header,url_to_query,salesforce_service_url,auth_header,form_name_to_download)
     # Get All Questions
-    question_endpoint = "/services/apexrest/twapi/questiondata/v1?objectType=GetQuestionData&formVersionId=" + form_version_id
+    question_endpoint = salesforce_service_url + "questiondata/v1?objectType=GetQuestionData&formVersionId=" + form_version_id
     question_dataframe = pd.DataFrame(columns=['externalId', 'id', 'name', 'caption', 'cascadingLevel',\
           'cascadingSelect', 'controllingQuestion', 'displayRepeatSectionInTable',\
           'dynamicOperation', 'dynamicOperationTestData', 'dynamicOperationType',\
@@ -15,7 +15,7 @@ def get_all_dataframes_and_write_to_excel_from_form_name(url_to_query,auth_heade
           'showAllQuestionOnOnePage', 'skipLogicBehavior', 'skipLogicOperator',\
           'hint', 'testDynamicOperation', 'type', 'useCurrentTimeAsDefault',\
           'changeLogNumber', 'options'])
-    question_dataframe = pd.concat([question_dataframe,get_pandas_dataframe_from_json_web_call(url_to_query,question_endpoint,auth_header)])
+    question_dataframe = pd.concat([question_dataframe,get_pandas_dataframe_from_json_web_call(url_to_query,salesforce_service_url,question_endpoint,auth_header)])
     #Iterate all questions that have options and create a new dataframe that has just the options
     options_dataframe = pd.DataFrame(columns=["externalId" , "id" , "name" , "position" , "caption","questionId" ])
     for index, frame in question_dataframe.iterrows():
@@ -31,12 +31,12 @@ def get_all_dataframes_and_write_to_excel_from_form_name(url_to_query,auth_heade
     questions_with_order['formOrder'] = questions_with_order.apply(lambda x: int(parentLookup[parentLookup['parentId'] == x['parent']]['parentPosition'].iloc[0]) * hackyMultiplier + int(x['position'])  if x['parent'] != "" else int(x['position']) * hackyMultiplier, axis =1 )
     questions_without_options = questions_with_order.sort_values(by=['formOrder']).drop(columns=['formOrder'])
     # Get all field mappings
-    field_mapping_endpoint = "/services/apexrest/twapi/formmappingdata/v1?objectType=GetFormMappingData&formVersionId=" + form_version_id
+    field_mapping_endpoint = salesforce_service_url + "formmappingdata/v1?objectType=GetFormMappingData&formVersionId=" + form_version_id
     field_mapping_dataframe = pd.DataFrame(columns = ['externalId', 'id', 'name', 'form', 'formVersion',\
           'formVersionMappingField', 'mobileUserField', 'objectApiName',\
           'formMappingField', 'isReference', 'matchingField', 'repeat',\
           'submissionAPIField', 'changeLogNumber', 'questionMappings'])
-    field_mapping_dataframe = pd.concat([field_mapping_dataframe,get_pandas_dataframe_from_json_web_call(url_to_query, field_mapping_endpoint, auth_header)])
+    field_mapping_dataframe = pd.concat([field_mapping_dataframe,get_pandas_dataframe_from_json_web_call(url_to_query,salesforce_service_url, field_mapping_endpoint, auth_header)])
     #Iterate all form mappings that have question mappings and create a new dataframe that has just the question mappings
     question_mapping_dataframe = pd.DataFrame(columns=["externalId", "name", "id", "fieldAPIName","isBroken","question","scoringGroup","field_mapping_id"])
     for index, frame in field_mapping_dataframe.iterrows():
@@ -49,13 +49,13 @@ def get_all_dataframes_and_write_to_excel_from_form_name(url_to_query,auth_heade
           question_mapping_dataframe = pd.concat([individual_question_mapping_df,question_mapping_dataframe])
     field_mapping_without_questions = field_mapping_dataframe.loc[:, field_mapping_dataframe.columns != 'questionMappings']
     # Get all Skip Logic
-    skip_logic_endpoint = "/services/apexrest/twapi/skiplogicdata/v1?objectType=GetSkipLogicData&formVersionId=" + form_version_id
+    skip_logic_endpoint = salesforce_service_url + "skiplogicdata/v1?objectType=GetSkipLogicData&formVersionId=" + form_version_id
     skip_logic_dataframe = pd.DataFrame(columns=["externalId" ,"id" ,"negate" ,"skipValue" ,"condition" ,"parentQuestion" ,"sourceQuestion" ,"form" ,"formVersion" ,"changeLogNumber"])
-    skip_logic_dataframe = pd.concat([skip_logic_dataframe, get_pandas_dataframe_from_json_web_call(url_to_query,skip_logic_endpoint, auth_header)])
+    skip_logic_dataframe = pd.concat([skip_logic_dataframe, get_pandas_dataframe_from_json_web_call(url_to_query,salesforce_service_url,skip_logic_endpoint, auth_header)])
     # Get all ORM
-    orm_endpoint = "/services/apexrest/twapi/objectrelationshipmappingdata/v1?objectType=GetObjectRelationshipMappingData&formVersionId=" + form_version_id
+    orm_endpoint = salesforce_service_url + "objectrelationshipmappingdata/v1?objectType=GetObjectRelationshipMappingData&formVersionId=" + form_version_id
     orm_dataframe = pd.DataFrame(columns=["externalId" ,"id" ,"name" ,"fieldApiName" ,"parentSurveyMapping" ,"childSurveyMapping" ,"formVersion" ,"changeLogNumber"])
-    orm_dataframe = pd.concat([orm_dataframe, get_pandas_dataframe_from_json_web_call(url_to_query,orm_endpoint, auth_header)])
+    orm_dataframe = pd.concat([orm_dataframe, get_pandas_dataframe_from_json_web_call(url_to_query,salesforce_service_url,orm_endpoint, auth_header)])
     # Replace IDs - Replace internal salesforce IDs + actual externalIds with computed external IDs
     form_dataframe_id_replaced = form_dataframe.copy()
     # default to english if form doesn't already contain it
@@ -161,9 +161,9 @@ def get_all_dataframes_and_write_to_excel_from_form_name(url_to_query,auth_heade
     writer.save()
 
     """# Get All Forms in an Org"""
-def get_all_forms_in_org(url_to_query,auth_header):
-    all_forms_endpoint = "/services/apexrest/twapi/formdata/v1?objectType=GetFormData&offset=0&limit=100"
-    all_form_dataframe = get_pandas_dataframe_from_json_web_call(url_to_query,all_forms_endpoint, auth_header)
+def get_all_forms_in_org(url_to_query,salesforce_service_url,auth_header):
+    all_forms_endpoint = salesforce_service_url + "formdata/v1?objectType=GetFormData&offset=0&limit=100"
+    all_form_dataframe = get_pandas_dataframe_from_json_web_call(url_to_query,salesforce_service_url,all_forms_endpoint, auth_header)
 
     sorted_forms_df = all_form_dataframe.sort_values(by='id',ascending=False)
 
