@@ -11,7 +11,7 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "justMyCode": true,
-            "args" : ["ability-energy-2891-dev-ed.scratch.my.salesforce.com", "/services/apexrest/", "00D010000008iR3!ARQAQPWq4wtXYCqsb_Kz4R5JZTN.V9tW2UKnRn2pMYxRPg9IdgDTlW8UboaRWtqTKzw1lz7YW6Q34ztocb7OiX_xCyWPgkUT", "example-test-forms/", "SISTEMA SALE04 - Data Collection & Quote - all fields visible.xlsx"]
+            "args" : ["ability-energy-2891-dev-ed.scratch.my.salesforce.com", "/services/apexrest/", "00D010000008iR3!ARQAQPWq4wtXYCqsb_Kz4R5JZTN.V9tW2UKnRn2pMYxRPg9IdgDTlW8UboaRWtqTKzw1lz7YW6Q34ztocb7OiX_xCyWPgkUT", "example-test-forms/", "LWR-B ENT01. Fournitures intrants.xlsx"]
         }
     ]
 }

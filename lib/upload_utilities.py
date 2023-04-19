@@ -23,11 +23,12 @@ def func_read_excel_file_and_upload(url_to_query,salesforce_service_url,auth_hea
         existing_questions_lookup, existing_options_lookup, questions_without_options = func_fetch_existing_questions(url_to_query,salesforce_service_url,auth_header,form_name_to_upload)
         
         # Improvement - first upload sections, then read them back as existing
-        just_parent_sections = upload_questions_without_options[upload_questions_without_options['type'] == 'section'].reindex()
-        not_parent_sections = upload_questions_without_options[upload_questions_without_options['type'] != 'section'] .reindex()
+        just_parent_sections = upload_questions_without_options[(upload_questions_without_options['type'] == 'section') | (upload_questions_without_options['type'] == 'repeat') ].reindex()
+        not_parent_sections = upload_questions_without_options[(upload_questions_without_options['type'] != 'section') & (upload_questions_without_options['type'] != 'repeat') ] .reindex()
         parents_result = func_upload_questions_without_options(url_to_query,salesforce_service_url,auth_header,form_name_to_upload, just_parent_sections, existing_questions_lookup)
         existing_questions_lookup, existing_options_lookup, questions_without_options = func_fetch_existing_questions(url_to_query,salesforce_service_url,auth_header,form_name_to_upload)
         questions_result = func_upload_questions_with_options(url_to_query,salesforce_service_url,auth_header,form_name_to_upload,upload_options, not_parent_sections, existing_options_lookup, existing_questions_lookup)
+        questions_result = pd.concat([parents_result,questions_result])
         question_id_lookup = func_fetch_back_uploaded_questions(url_to_query,salesforce_service_url,auth_header,form_name_to_upload)
         upload_skip_logic_referencing_new_ids, field_mapping_referencing_new_ids, question_mapping_referencing_new_ids = func_update_dependent_objects_from_spreadsheet(url_to_query,salesforce_service_url,auth_header,upload_question_mapping, question_id_lookup, upload_field_mapping_no_question_mapping, upload_skip_logic)
         field_mapping_without_questions, question_mapping_dataframe = func_read_existing_field_and_form_mappings(url_to_query,salesforce_service_url,auth_header,form_name_to_upload)
@@ -201,7 +202,9 @@ def func_upload_questions_with_options(url_to_query,salesforce_service_url,auth_
                     'required', 'responseValidation', 'showAllQuestionOnOnePage',
                     'skipLogicBehavior', 'skipLogicOperator', 'hint',
                     'testDynamicOperation', 'type', 'useCurrentTimeAsDefault',
-                    'changeLogNumber', 'options']].iloc[minimum:maximum].to_json(orient="records",force_ascii=False)).replace('\\','').replace('"[{"','[{"').replace('"}]"','"}]').replace(',"options":""',',"options":[]').replace('null','""') + '}'
+                    'changeLogNumber', 'options']].iloc[minimum:maximum].to_json(orient="records",force_ascii=False))\
+                        .replace('\\','').replace('"[{"','[{"').replace('"}]"','"}]').replace(',"options":""',',"options":[]')\
+                        .replace('null','""').replace('"maximum":"",','').replace('"minimum":"",','').replace('"responseValidation":"",','').replace('"exampleOfValidResponse":"",','') + '}'
                 # question_with_options_creation_string
                 questions_temp_result =  upload_payload_to_url(url_to_query,salesforce_service_url,auth_header,salesforce_service_url + 'questiondata/v1?objectType=PutQuestionData', question_with_options_creation_string)
                
@@ -493,6 +496,18 @@ def func_print_all_statuses_after_upload(form_result, questions_result, form_map
 
     # NOTE: Bug IDALMSA-12051 causes the API to return "Skip Condition created successfully" when the API has actually updated instead of created. Low priority to fix as this doesn't break anything.
      print(skip_logic_result)
+
+     print ("Failures")
+     form_result_failures = form_result[form_result['success'] == False] if not type(form_result) is str else ''
+     questions_result_failures = questions_result[questions_result['success'] == False] if not  type(questions_result) is str else ''
+     form_mapping_result_failures = form_mapping_result[form_mapping_result['success'] == False] if not  type(form_mapping_result) is str else ''
+     orm_result_failures = orm_result[orm_result['success'] == False] if not  type(orm_result) is str else ''
+     skip_logic_result_failures = skip_logic_result[skip_logic_result['success'] == False] if not  type(skip_logic_result) is str else ''
+     print(form_result_failures)
+     print(form_mapping_result_failures)
+     print(questions_result_failures)
+     print(orm_result_failures)
+     print(skip_logic_result_failures)
 
 def upload_all_files_in_folder(url_to_query,salesforce_service_url,auth_header,workingDirectory):
     for filename in os.listdir(workingDirectory):
