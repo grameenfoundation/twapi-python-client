@@ -3,20 +3,67 @@ import xlsxwriter
 from lib.shared_utilities import get_pandas_dataframe_from_json_web_call, get_version_changelog_from_form_name, upload_payload_to_url
 
 
-def get_all_dataframes_and_write_to_excel_from_form_name(url_to_query,salesforce_service_url,auth_header,workingDirectory,form_name_to_download):
+
+# This function is a bit of a hack - for forms larger than 100 questions, it's not possible to pull in all the questions in one API call
+# Instead, iterate through all questions in the org and make a giant dataframe, then filter it by just the relevant ones
+def get_all_questions_in_org_then_filter(url_to_query,salesforce_service_url,auth_header,form_version_id,persistent_full_question_dataframe ):
+    
+    limit = 50
+    offset = 0
+    
+    if (persistent_full_question_dataframe is None):
+
+        moreQuestionsLeft = True
+        question_dataframe = pd.DataFrame(columns=['externalId', 'id', 'name', 'caption', 'cascadingLevel',\
+            'cascadingSelect', 'controllingQuestion', 'displayRepeatSectionInTable',\
+            'dynamicOperation', 'dynamicOperationTestData', 'dynamicOperationType',\
+            'exampleOfValidResponse', 'form', 'formVersion', 'hidden', 'maximum',\
+            'minimum', 'parent', 'position', 'previousVersion', 'printAnswer',\
+            'repeatSourceValue', 'repeatTimes', 'required', 'responseValidation',\
+            'showAllQuestionOnOnePage', 'skipLogicBehavior', 'skipLogicOperator',\
+            'hint', 'testDynamicOperation', 'type', 'useCurrentTimeAsDefault',\
+            'changeLogNumber', 'options'])
+        while (moreQuestionsLeft):
+            question_endpoint = salesforce_service_url + "questiondata/v1?objectType=GetQuestionData&limit=" + str(limit) + "&offset=" + str(offset)
+            try:
+                question_dataframe = pd.concat([question_dataframe,get_pandas_dataframe_from_json_web_call(url_to_query,salesforce_service_url,question_endpoint,auth_header)])
+            except Exception as e: 
+                print(e)
+                # TODO - this is hacky AF. Call until an error is thrown, this is not best practice.
+                moreQuestionsLeft = False;
+            print("Offset: " + str(offset) + " Limit: " + str(limit))
+            offset += limit
+        # Save this full dataframe in a global var for future use
+        persistent_full_question_dataframe = question_dataframe
+    else:
+        question_dataframe = persistent_full_question_dataframe
+
+    relevant_questions = question_dataframe[question_dataframe['formVersion'] == form_version_id]
+    return relevant_questions, persistent_full_question_dataframe
+
+
+def get_all_dataframes_and_write_to_excel_from_form_name(url_to_query,salesforce_service_url,auth_header,workingDirectory,form_name_to_download,persistent_full_question_dataframe, form_has_more_than_100_questions=False):
     form_version_id, changelog_number, form_id, form_external_id, form_dataframe = get_version_changelog_from_form_name(url_to_query,salesforce_service_url,auth_header,form_name_to_download)
+    
     # Get All Questions
-    question_endpoint = salesforce_service_url + "questiondata/v1?objectType=GetQuestionData&formVersionId=" + form_version_id
-    question_dataframe = pd.DataFrame(columns=['externalId', 'id', 'name', 'caption', 'cascadingLevel',\
-          'cascadingSelect', 'controllingQuestion', 'displayRepeatSectionInTable',\
-          'dynamicOperation', 'dynamicOperationTestData', 'dynamicOperationType',\
-          'exampleOfValidResponse', 'form', 'formVersion', 'hidden', 'maximum',\
-          'minimum', 'parent', 'position', 'previousVersion', 'printAnswer',\
-          'repeatSourceValue', 'repeatTimes', 'required', 'responseValidation',\
-          'showAllQuestionOnOnePage', 'skipLogicBehavior', 'skipLogicOperator',\
-          'hint', 'testDynamicOperation', 'type', 'useCurrentTimeAsDefault',\
-          'changeLogNumber', 'options'])
-    question_dataframe = pd.concat([question_dataframe,get_pandas_dataframe_from_json_web_call(url_to_query,salesforce_service_url,question_endpoint,auth_header)])
+    if (not form_has_more_than_100_questions):
+        question_endpoint = salesforce_service_url + "questiondata/v1?objectType=GetQuestionData&formVersionId=" + form_version_id
+        question_dataframe = pd.DataFrame(columns=['externalId', 'id', 'name', 'caption', 'cascadingLevel',\
+            'cascadingSelect', 'controllingQuestion', 'displayRepeatSectionInTable',\
+            'dynamicOperation', 'dynamicOperationTestData', 'dynamicOperationType',\
+            'exampleOfValidResponse', 'form', 'formVersion', 'hidden', 'maximum',\
+            'minimum', 'parent', 'position', 'previousVersion', 'printAnswer',\
+            'repeatSourceValue', 'repeatTimes', 'required', 'responseValidation',\
+            'showAllQuestionOnOnePage', 'skipLogicBehavior', 'skipLogicOperator',\
+            'hint', 'testDynamicOperation', 'type', 'useCurrentTimeAsDefault',\
+            'changeLogNumber', 'options'])
+        question_dataframe = pd.concat([question_dataframe,get_pandas_dataframe_from_json_web_call(url_to_query,salesforce_service_url,question_endpoint,auth_header)])
+    else:
+        question_dataframe, persistent_full_question_dataframe = get_all_questions_in_org_then_filter(url_to_query,salesforce_service_url,auth_header,form_version_id,persistent_full_question_dataframe)
+    
+    if (question_dataframe.empty):
+        print("No Questions in this form")
+        return None
     #Iterate all questions that have options and create a new dataframe that has just the options
     options_dataframe = pd.DataFrame(columns=["externalId" , "id" , "name" , "position" , "caption","questionId" ])
     for index, frame in question_dataframe.iterrows():
@@ -27,9 +74,17 @@ def get_all_dataframes_and_write_to_excel_from_form_name(url_to_query,salesforce
           options_dataframe = pd.concat([individual_option_df,options_dataframe])
     questions_without_options = question_dataframe.loc[:, question_dataframe.columns != 'options']
     parentLookup = questions_without_options[questions_without_options['parent'] == ""][['position','name','id']].rename(columns={'position':'parentPosition','name':'parentName','id':'parentId'})
+    cascadingSelectLookup = questions_without_options[questions_without_options['type'] == "cascading-select"][['position','name','id']].rename(columns={'position':'parentPosition','name':'parentName','id':'parentId'})
+    if (not cascadingSelectLookup.empty):
+        parentLookup = pd.concat([parentLookup,cascadingSelectLookup])
     questions_with_order = questions_without_options.copy()
     hackyMultiplier = 10000 #arbitrarily large hacky multiplier
-    questions_with_order['formOrder'] = questions_with_order.apply(lambda x: int(parentLookup[parentLookup['parentId'] == x['parent']]['parentPosition'].iloc[0]) * hackyMultiplier + int(x['position'])  if x['parent'] != "" else int(x['position']) * hackyMultiplier, axis =1 )
+    print(parentLookup)
+    print(questions_with_order[['id','name','parent','type']])
+    questions_with_order['formOrder'] = \
+        questions_with_order.apply(lambda x: 
+            int(parentLookup[parentLookup['parentId'] == x['parent']]['parentPosition'].iloc[0]) * hackyMultiplier + int(x['position'])  \
+                if x['parent'] != "" else int(x['position']) * hackyMultiplier, axis =1 )
     questions_without_options = questions_with_order.sort_values(by=['formOrder']).drop(columns=['formOrder'])
     # Get all field mappings
     field_mapping_endpoint = salesforce_service_url + "formmappingdata/v1?objectType=GetFormMappingData&formVersionId=" + form_version_id
@@ -139,7 +194,8 @@ def get_all_dataframes_and_write_to_excel_from_form_name(url_to_query,salesforce
     orm_dataframe_id_replaced.drop(columns=['externalId'],inplace=True)
     orm_dataframe_id_replaced = orm_dataframe_id_replaced.drop(columns=['id','parentSurveyMapping','childSurveyMapping','formVersion','changeLogNumber'])
     # Write an excel sheet
-    writer = pd.ExcelWriter(workingDirectory + "/" + form_name_to_download + '.xlsx',engine='xlsxwriter')
+    form_name_to_write = form_name_to_download.replace("/","_").replace("\\","_") + ".xlsx"
+    writer = pd.ExcelWriter(workingDirectory + "/" + form_name_to_write,engine='xlsxwriter')
     workbook=writer.book
 
     # https://datascience.stackexchange.com/questions/46437/how-to-write-multiple-data-frames-in-an-excel-sheet
@@ -160,6 +216,7 @@ def get_all_dataframes_and_write_to_excel_from_form_name(url_to_query,salesforce
     skip_logic_dataframe_id_replaced.to_excel(writer,sheet_name='Skip_Logic',startrow=1 , startcol=0,index=False)
     orm_dataframe_id_replaced.to_excel(writer,sheet_name='Object_Relationship_Mappings',startrow=1 , startcol=0,index=False)
     writer.close()
+    return persistent_full_question_dataframe
 
     """# Get All Forms in an Org"""
 def get_all_forms_in_org(url_to_query,salesforce_service_url,auth_header,workingDirectory):
@@ -167,11 +224,11 @@ def get_all_forms_in_org(url_to_query,salesforce_service_url,auth_header,working
     all_form_dataframe = get_pandas_dataframe_from_json_web_call(url_to_query,salesforce_service_url,all_forms_endpoint, auth_header)
 
     sorted_forms_df = all_form_dataframe.sort_values(by='id',ascending=False)
-
+    persistent_full_question_dataframe = None
     for index, frame in sorted_forms_df.iterrows():
         thisFormName = frame['name']
         print(thisFormName)
-        get_all_dataframes_and_write_to_excel_from_form_name(url_to_query,salesforce_service_url,auth_header,workingDirectory,thisFormName)
-
+        
+        persistent_full_question_dataframe = get_all_dataframes_and_write_to_excel_from_form_name(url_to_query,salesforce_service_url,auth_header,workingDirectory,thisFormName, persistent_full_question_dataframe, True)
 
 

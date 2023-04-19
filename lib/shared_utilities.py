@@ -49,7 +49,7 @@ def get_pandas_dataframe_from_json_web_call(url_to_query,salesforce_service_url,
     conn.request("GET",  endpoint_to_hit, payload, headers)
     res = conn.getresponse()
     data = res.read()
-    decoded_form_data = data.decode("utf-8")
+    decoded_form_data = data.decode("utf-8").replace("\'","’") #Sanitize any single quotes before these are transformed later
     data_obj = json.loads(decoded_form_data)
     records_dataframe = pd.json_normalize(data_obj, record_path =['records'])
     return records_dataframe
