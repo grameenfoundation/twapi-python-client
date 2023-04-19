@@ -21,7 +21,13 @@ def func_read_excel_file_and_upload(url_to_query,salesforce_service_url,auth_hea
 
         form_result, form_name_to_upload = func_upload_form(url_to_query,salesforce_service_url,auth_header,upload_form_dataframe)
         existing_questions_lookup, existing_options_lookup, questions_without_options = func_fetch_existing_questions(url_to_query,salesforce_service_url,auth_header,form_name_to_upload)
-        questions_result = func_upload_questions_with_options(url_to_query,salesforce_service_url,auth_header,form_name_to_upload,upload_options, upload_questions_without_options, existing_options_lookup, existing_questions_lookup)
+        
+        # Improvement - first upload sections, then read them back as existing
+        just_parent_sections = upload_questions_without_options[upload_questions_without_options['type'] == 'section'].reindex()
+        not_parent_sections = upload_questions_without_options[upload_questions_without_options['type'] != 'section'] .reindex()
+        parents_result = func_upload_questions_without_options(url_to_query,salesforce_service_url,auth_header,form_name_to_upload, just_parent_sections, existing_questions_lookup)
+        existing_questions_lookup, existing_options_lookup, questions_without_options = func_fetch_existing_questions(url_to_query,salesforce_service_url,auth_header,form_name_to_upload)
+        questions_result = func_upload_questions_with_options(url_to_query,salesforce_service_url,auth_header,form_name_to_upload,upload_options, not_parent_sections, existing_options_lookup, existing_questions_lookup)
         question_id_lookup = func_fetch_back_uploaded_questions(url_to_query,salesforce_service_url,auth_header,form_name_to_upload)
         upload_skip_logic_referencing_new_ids, field_mapping_referencing_new_ids, question_mapping_referencing_new_ids = func_update_dependent_objects_from_spreadsheet(url_to_query,salesforce_service_url,auth_header,upload_question_mapping, question_id_lookup, upload_field_mapping_no_question_mapping, upload_skip_logic)
         field_mapping_without_questions, question_mapping_dataframe = func_read_existing_field_and_form_mappings(url_to_query,salesforce_service_url,auth_header,form_name_to_upload)
@@ -148,7 +154,7 @@ def func_upload_questions_with_options(url_to_query,salesforce_service_url,auth_
             upload_questions_with_options = upload_questions_with_options.merge(existing_questions_lookup[['id','name']],how="left",on="name").fillna('')
 
             if (not options_associated_with_questions.empty):
-                for questionName in options_associated_with_questions.iteritems():
+                for questionName in options_associated_with_questions.items():
                     thisQuestionName = questionName[1]
                     upload_options_json = str(upload_options_sanitized[upload_options_sanitized['questionName'] == thisQuestionName][['externalId','id','name','position','caption']].to_json(orient='records',force_ascii=False))
                     print(upload_options_json)
@@ -167,28 +173,105 @@ def func_upload_questions_with_options(url_to_query,salesforce_service_url,auth_
             upload_questions_with_options = upload_questions_with_options.merge(parent_externalId_lookup,how="left",on='parentName').fillna('')
             upload_questions_with_options['parent'] = upload_questions_with_options.apply(lambda x: str(x.parentExternalId) if x.parentName and not x.parent else x.parent, axis = 1)
 
-            upload_questions_with_options['form'] = form_id
-            upload_questions_with_options['formVersion'] = form_version_id
-            upload_questions_with_options['changeLogNumber'] = changelog_number
 
-            upload_questions_with_options
 
-            question_with_options_creation_string = '{"records":' + str(upload_questions_with_options[['externalId', 'id', 'name',
-                'caption', 'cascadingLevel',
-                'cascadingSelect', 'controllingQuestion', 'displayRepeatSectionInTable',
-                'dynamicOperationType', 'exampleOfValidResponse',
-                'form', 'formVersion', 'hidden', 
-                'maximum',  'minimum', 'parent', 'position',
-                'previousVersion', 'printAnswer',
-                'repeatSourceValue', 'repeatTimes',
-                'required', 'responseValidation', 'showAllQuestionOnOnePage',
-                'skipLogicBehavior', 'skipLogicOperator', 'hint',
-                'testDynamicOperation', 'type', 'useCurrentTimeAsDefault',
-                'changeLogNumber', 'options']].to_json(orient="records",force_ascii=False)).replace('\\','').replace('"[{"','[{"').replace('"}]"','"}]').replace(',"options":""',',"options":[]').replace('null','""') + '}'
-            # question_with_options_creation_string
 
-            questions_result = upload_payload_to_url(url_to_query,salesforce_service_url,auth_header,salesforce_service_url + 'questiondata/v1?objectType=PutQuestionData', question_with_options_creation_string)
+            questions_result = None
+            # Optimization - only upload 10 questions at a time
+            for currentChunk in range(0, len(upload_questions_with_options.index), 10):
+
+                 # Fetch latest form ID and changelog from the API
+                form_version_id, changelog_number, form_id, form_external_id, form_dataframe = get_version_changelog_from_form_name(url_to_query,salesforce_service_url,auth_header,form_name_to_upload)
+
+                upload_questions_with_options['form'] = form_id
+                upload_questions_with_options['formVersion'] = form_version_id
+                upload_questions_with_options['changeLogNumber'] = changelog_number
+                minimum = max(currentChunk,0)
+                maximum = min(currentChunk+10,len(upload_questions_with_options.index))
+
+
+                question_with_options_creation_string = '{"records":' + str(upload_questions_with_options[['externalId', 'id', 'name',
+                    'caption', 'cascadingLevel',
+                    'cascadingSelect', 'controllingQuestion', 'displayRepeatSectionInTable',
+                    'dynamicOperationType', 'exampleOfValidResponse',
+                    'form', 'formVersion', 'hidden', 
+                    'maximum',  'minimum', 'parent', 'position',
+                    'previousVersion', 'printAnswer',
+                    'repeatSourceValue', 'repeatTimes',
+                    'required', 'responseValidation', 'showAllQuestionOnOnePage',
+                    'skipLogicBehavior', 'skipLogicOperator', 'hint',
+                    'testDynamicOperation', 'type', 'useCurrentTimeAsDefault',
+                    'changeLogNumber', 'options']].iloc[minimum:maximum].to_json(orient="records",force_ascii=False)).replace('\\','').replace('"[{"','[{"').replace('"}]"','"}]').replace(',"options":""',',"options":[]').replace('null','""') + '}'
+                # question_with_options_creation_string
+                questions_temp_result =  upload_payload_to_url(url_to_query,salesforce_service_url,auth_header,salesforce_service_url + 'questiondata/v1?objectType=PutQuestionData', question_with_options_creation_string)
+               
+                if (questions_result is None):
+                         questions_result = questions_temp_result
+                else:
+                    questions_result = pd.concat([questions_result,questions_temp_result])
             return questions_result
+
+
+#TODO - copy/pasted, clean up later
+def func_upload_questions_without_options(url_to_query,salesforce_service_url,auth_header,form_name_to_upload, upload_questions_without_options, existing_questions_lookup):
+            
+            upload_questions_sanitized = upload_questions_without_options.copy().fillna("")
+            for column in upload_questions_sanitized:
+                if ('caption' in column):
+                    #Remove the language-specific suffix
+                    upload_questions_sanitized = upload_questions_sanitized.rename(columns={column:'caption'})
+
+            # Fetch latest form ID and changelog from the API
+            form_version_id, changelog_number, form_id, form_external_id, form_dataframe = get_version_changelog_from_form_name(url_to_query,salesforce_service_url,auth_header,form_name_to_upload)
+
+            upload_questions_with_options = upload_questions_sanitized.copy()
+            upload_questions_with_options['options'] = None
+
+            # Treat externalID as optional; if it is not defined, use the name instead
+            upload_questions_with_options['externalId'] = upload_questions_with_options['name']
+
+            upload_questions_with_options = upload_questions_with_options.merge(existing_questions_lookup[['id','name']],how="left",on="name").fillna('')
+            upload_questions_with_options['parent'] = ''
+            # In cases where the parent name is not blank but the parent is blank, this means that no ID already exists for the question parent (it hasn't been updated) - use the externalID
+            parent_externalId_lookup = upload_questions_with_options[upload_questions_with_options['parentName'] == ''][['name','externalId']].rename(columns={'name':'parentName','externalId':'parentExternalId'})
+
+            upload_questions_with_options = upload_questions_with_options.merge(parent_externalId_lookup,how="left",on='parentName').fillna('')
+            #upload_questions_with_options['parent'] = upload_questions_with_options.apply(lambda x: str(x.parentExternalId) if x.parentName and not x.parent else x.parent, axis = 1)
+            questions_result = None
+            # Optimization - only upload 10 questions at a time
+            for currentChunk in range(0, len(upload_questions_with_options.index), 10):
+
+                 # Fetch latest form ID and changelog from the API
+                form_version_id, changelog_number, form_id, form_external_id, form_dataframe = get_version_changelog_from_form_name(url_to_query,salesforce_service_url,auth_header,form_name_to_upload)
+
+                upload_questions_with_options['form'] = form_id
+                upload_questions_with_options['formVersion'] = form_version_id
+                upload_questions_with_options['changeLogNumber'] = changelog_number
+                minimum = max(currentChunk,0)
+                maximum = min(currentChunk+10,len(upload_questions_with_options.index))
+
+
+                question_with_options_creation_string = '{"records":' + str(upload_questions_with_options[['externalId', 'id', 'name',
+                    'caption', 'cascadingLevel',
+                    'cascadingSelect', 'controllingQuestion', 'displayRepeatSectionInTable',
+                    'dynamicOperationType', 'exampleOfValidResponse',
+                    'form', 'formVersion', 'hidden', 
+                    'maximum',  'minimum', 'parent', 'position',
+                    'previousVersion', 'printAnswer',
+                    'repeatSourceValue', 'repeatTimes',
+                    'required', 'responseValidation', 'showAllQuestionOnOnePage',
+                    'skipLogicBehavior', 'skipLogicOperator', 'hint',
+                    'testDynamicOperation', 'type', 'useCurrentTimeAsDefault',
+                    'changeLogNumber', 'options']].iloc[minimum:maximum].to_json(orient="records",force_ascii=False)).replace('\\','').replace('"[{"','[{"').replace('"}]"','"}]').replace(',"options":""',',"options":[]').replace('null','""') + '}'
+                # question_with_options_creation_string
+                questions_temp_result =  upload_payload_to_url(url_to_query,salesforce_service_url,auth_header,salesforce_service_url + 'questiondata/v1?objectType=PutQuestionData', question_with_options_creation_string)
+               
+                if (questions_result is None):
+                         questions_result = questions_temp_result
+                else:
+                    questions_result = pd.concat([questions_result,questions_temp_result])
+            return questions_result
+
 """## Read Back Questions and update any relevant IDs"""
 
 def func_fetch_back_uploaded_questions(url_to_query,salesforce_service_url,auth_header,form_name_to_upload):
@@ -276,7 +359,7 @@ def func_upload_field_and_form_mappings(url_to_query,salesforce_service_url,auth
 
         upload_question_mapping_with_ids = question_mapping_referencing_new_ids.merge(question_mapping_dataframe[['name','id']],how="left",on="name")
         if (not question_mapping_associated_with_field_mapping.empty):
-            for field_mapping_name in question_mapping_associated_with_field_mapping.iteritems():
+            for field_mapping_name in question_mapping_associated_with_field_mapping.items():
                 thisFieldMapping = field_mapping_name[1]
                 print(thisFieldMapping)
                 upload_question_mapping_json = str(upload_question_mapping_with_ids[upload_question_mapping_with_ids['fieldMappingName'] == thisFieldMapping][['externalId', 'name', 'id', 'fieldAPIName', 'isBroken','question', 'scoringGroup']].to_json(orient='records',force_ascii=False))

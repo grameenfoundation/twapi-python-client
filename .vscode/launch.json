@@ -11,7 +11,7 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "justMyCode": true,
-            "args" : ["louise-twapi-testing-4.my.salesforce.com", "/services/apexrest/twapi/", "00DDp0000015LkU!ARUAQD98wncWR_l.l4Srw0iA4jmZyPFYAfVPazJZA_F8F8gSz4Y29uBW7fe_laUXAUhGDv7.x83ztZNbTxiLI13yr8ydgdcU", "tmp/", "B2p Project Assessment - New Site_DRAFT REVISIONS V3"]
+            "args" : ["ability-energy-2891-dev-ed.scratch.my.salesforce.com", "/services/apexrest/", "00D010000008iR3!ARQAQPWq4wtXYCqsb_Kz4R5JZTN.V9tW2UKnRn2pMYxRPg9IdgDTlW8UboaRWtqTKzw1lz7YW6Q34ztocb7OiX_xCyWPgkUT", "example-test-forms/", "SISTEMA SALE04 - Data Collection & Quote - all fields visible.xlsx"]
         }
     ]
 }
