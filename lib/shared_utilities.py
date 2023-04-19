@@ -68,3 +68,44 @@ def upload_payload_to_url(url_to_query,salesforce_service_url, auth_header, endp
       results_dataframe = pd.json_normalize(data_obj)
       print(data.decode("utf-8"))
       return results_dataframe
+
+
+# This function is a bit of a hack - for forms larger than 100 questions, it's not possible to pull in all the questions in one API call
+# Instead, iterate through all questions in the org and make a giant dataframe, then filter it by just the relevant ones
+def get_all_questions_in_org_then_filter(url_to_query,salesforce_service_url,auth_header,form_version_id,persistent_full_question_dataframe ):
+    
+    limit = 50
+    offset = 0
+    
+    if (persistent_full_question_dataframe is None):
+
+        moreQuestionsLeft = True
+        question_dataframe = pd.DataFrame(columns=['externalId', 'id', 'name', 'caption', 'cascadingLevel',\
+            'cascadingSelect', 'controllingQuestion', 'displayRepeatSectionInTable',\
+            'dynamicOperation', 'dynamicOperationTestData', 'dynamicOperationType',\
+            'exampleOfValidResponse', 'form', 'formVersion', 'hidden', 'maximum',\
+            'minimum', 'parent', 'position', 'previousVersion', 'printAnswer',\
+            'repeatSourceValue', 'repeatTimes', 'required', 'responseValidation',\
+            'showAllQuestionOnOnePage', 'skipLogicBehavior', 'skipLogicOperator',\
+            'hint', 'testDynamicOperation', 'type', 'useCurrentTimeAsDefault',\
+            'changeLogNumber', 'options'])
+        while (moreQuestionsLeft):
+            question_endpoint = salesforce_service_url + "questiondata/v1?objectType=GetQuestionData&limit=" + str(limit) + "&offset=" + str(offset)
+            try:
+                temp_question_dataframe = get_pandas_dataframe_from_json_web_call(url_to_query,salesforce_service_url,question_endpoint,auth_header)
+                question_dataframe = pd.concat([question_dataframe,temp_question_dataframe])
+                if temp_question_dataframe.empty:
+                      moreQuestionsLeft = False
+            except Exception as e: 
+                print(e)
+                # TODO - this is hacky AF. Call until an error is thrown, this is not best practice.
+                moreQuestionsLeft = False;
+            print("Offset: " + str(offset) + " Limit: " + str(limit))
+            offset += limit
+        # Save this full dataframe in a global var for future use
+        persistent_full_question_dataframe = question_dataframe
+    else:
+        question_dataframe = persistent_full_question_dataframe
+
+    relevant_questions = question_dataframe[question_dataframe['formVersion'] == form_version_id]
+    return relevant_questions, persistent_full_question_dataframe

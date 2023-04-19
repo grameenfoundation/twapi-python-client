@@ -2,13 +2,16 @@ import os
 from types import SimpleNamespace
 import pandas as pd
 from urllib.parse import quote
-from lib.shared_utilities import get_pandas_dataframe_from_json_web_call, get_version_changelog_from_form_name, upload_payload_to_url
+from lib.shared_utilities import get_pandas_dataframe_from_json_web_call, get_version_changelog_from_form_name, upload_payload_to_url, get_all_questions_in_org_then_filter
 import xlsxwriter
 import openpyxl
+import tabulate
+import re
 
 """## Read excel file"""
 
 def func_read_excel_file_and_upload(url_to_query,salesforce_service_url,auth_header,workingDirectory, fileName):
+        
         # Read excel file into dataframes
         xls = pd.ExcelFile(workingDirectory + fileName)
         upload_form_dataframe = pd.read_excel(xls, 'Forms',header=1)
@@ -48,8 +51,6 @@ def func_upload_form(url_to_query,salesforce_service_url,auth_header,upload_form
         # Fetch latest form ID and changelog from the API
         form_version_id, changelog_number, form_id, form_external_id, form_dataframe = get_version_changelog_from_form_name(url_to_query,salesforce_service_url,auth_header,form_name_to_upload)
 
-        upload_form_dataframe_relevant_columns
-
         updating_existing_form = form_id
         if updating_existing_form:
             #update existing form
@@ -82,18 +83,19 @@ def func_upload_form(url_to_query,salesforce_service_url,auth_header,upload_form
 def func_fetch_existing_questions(url_to_query,salesforce_service_url,auth_header,form_name_to_upload):
         form_version_id, changelog_number, form_id, form_external_id, form_dataframe = get_version_changelog_from_form_name(url_to_query,salesforce_service_url,auth_header,form_name_to_upload)
 
+        question_dataframe, persistent_full_question_dataframe = get_all_questions_in_org_then_filter(url_to_query,salesforce_service_url,auth_header,form_version_id,None)
         # First read in all known questions + options for this form into dataframes
-        question_endpoint = salesforce_service_url + "questiondata/v1?objectType=GetQuestionData&formVersionId=" + form_version_id
-        question_dataframe = pd.DataFrame(columns=['externalId', 'id', 'name', 'caption', 'cascadingLevel',\
-            'cascadingSelect', 'controllingQuestion', 'displayRepeatSectionInTable',\
-            'dynamicOperation', 'dynamicOperationTestData', 'dynamicOperationType',\
-            'exampleOfValidResponse', 'form', 'formVersion', 'hidden', 'maximum',\
-            'minimum', 'parent', 'position', 'previousVersion', 'printAnswer',\
-            'repeatSourceValue', 'repeatTimes', 'required', 'responseValidation',\
-            'showAllQuestionOnOnePage', 'skipLogicBehavior', 'skipLogicOperator',\
-            'hint', 'testDynamicOperation', 'type', 'useCurrentTimeAsDefault',\
-            'changeLogNumber', 'options'])
-        question_dataframe = pd.concat([question_dataframe,get_pandas_dataframe_from_json_web_call(url_to_query,salesforce_service_url,question_endpoint, auth_header)])
+        # question_endpoint = salesforce_service_url + "questiondata/v1?objectType=GetQuestionData&formVersionId=" + form_version_id
+        # question_dataframe = pd.DataFrame(columns=['externalId', 'id', 'name', 'caption', 'cascadingLevel',\
+        #     'cascadingSelect', 'controllingQuestion', 'displayRepeatSectionInTable',\
+        #     'dynamicOperation', 'dynamicOperationTestData', 'dynamicOperationType',\
+        #     'exampleOfValidResponse', 'form', 'formVersion', 'hidden', 'maximum',\
+        #     'minimum', 'parent', 'position', 'previousVersion', 'printAnswer',\
+        #     'repeatSourceValue', 'repeatTimes', 'required', 'responseValidation',\
+        #     'showAllQuestionOnOnePage', 'skipLogicBehavior', 'skipLogicOperator',\
+        #     'hint', 'testDynamicOperation', 'type', 'useCurrentTimeAsDefault',\
+        #     'changeLogNumber', 'options'])
+        # question_dataframe = pd.concat([question_dataframe,get_pandas_dataframe_from_json_web_call(url_to_query,salesforce_service_url,question_endpoint, auth_header)])
         # TODO - refactor to shared
         #Iterate all questions that have options and create a new dataframe that has just the options
         options_dataframe = pd.DataFrame(columns=["externalId" , "id" , "name" , "position" , "caption" ])
@@ -129,7 +131,7 @@ def func_upload_questions_with_options(url_to_query,salesforce_service_url,auth_
             if (upload_options_sanitized.empty):
                 upload_options_sanitized['externalId'] = None
             else:
-                upload_options_sanitized['externalId'] = upload_options_sanitized['name']
+                upload_options_sanitized['externalId'] = upload_options_sanitized['name'].apply(lambda x: re.sub( '(?<!^)(?=[A-Z])', '_', x ).lower())+ "_" + upload_options_sanitized['position'].astype(str) #Replace Capital Letters with "_(lowercase letter)" to prevent duplicates from salesforce IDs
             upload_options_sanitized = upload_options_sanitized[['name','position','caption','questionName','externalId']]
 
             upload_questions_sanitized = upload_questions_without_options.copy().fillna("")
@@ -279,12 +281,7 @@ def func_upload_questions_without_options(url_to_query,salesforce_service_url,au
 
 def func_fetch_back_uploaded_questions(url_to_query,salesforce_service_url,auth_header,form_name_to_upload):
         form_version_id, changelog_number, form_id, form_external_id, form_dataframe = get_version_changelog_from_form_name(url_to_query,salesforce_service_url,auth_header,form_name_to_upload)
-
-        question_endpoint = salesforce_service_url + "questiondata/v1?objectType=GetQuestionData&formVersionId=" + form_version_id
-        questions_after_upload = get_pandas_dataframe_from_json_web_call(url_to_query,salesforce_service_url,question_endpoint, auth_header)
-
-        questions_after_upload
-
+        questions_after_upload, persistent_full_question_dataframe = get_all_questions_in_org_then_filter(url_to_query,salesforce_service_url,auth_header,form_version_id,None)
         question_id_lookup = questions_after_upload[['id','name']].rename(columns={'id':'questionId','name':'questionName'})
         return question_id_lookup
 """### Update any dependent objects from the spreadsheet:
@@ -358,7 +355,7 @@ def func_upload_field_and_form_mappings(url_to_query,salesforce_service_url,auth
         if (question_mapping_referencing_new_ids.empty):
             question_mapping_referencing_new_ids['externalId'] = None
         else:
-            question_mapping_referencing_new_ids['externalId'] = question_mapping_referencing_new_ids['name']
+            question_mapping_referencing_new_ids['externalId'] = question_mapping_referencing_new_ids['name'] + question_mapping_referencing_new_ids['fieldAPIName'] 
 
         upload_question_mapping_with_ids = question_mapping_referencing_new_ids.merge(question_mapping_dataframe[['name','id']],how="left",on="name")
         if (not question_mapping_associated_with_field_mapping.empty):
@@ -486,27 +483,39 @@ def func_upload_skip_logic(url_to_query,salesforce_service_url,auth_header,form_
 """# Review any errors"""
 
 def func_print_all_statuses_after_upload(form_result, questions_result, form_mapping_result, orm_result, skip_logic_result):
-     print(form_result)
+     
+     pd.set_option('display.max_colwidth', None)
+     print ("Form")
+     print(form_result.to_markdown())
 
-     print(questions_result)
+     print ("Questions")
+     print(questions_result.to_markdown())
 
-     print(form_mapping_result)
+     print("Form Mapping")
+     print(form_mapping_result.to_markdown())
 
-     print(orm_result)
+     print("ORM")
+     print(orm_result.to_markdown())
 
     # NOTE: Bug IDALMSA-12051 causes the API to return "Skip Condition created successfully" when the API has actually updated instead of created. Low priority to fix as this doesn't break anything.
-     print(skip_logic_result)
+     print("Skip Logic")
+     print(skip_logic_result.to_markdown())
 
      print ("Failures")
-     form_result_failures = form_result[form_result['success'] == False] if not type(form_result) is str else ''
-     questions_result_failures = questions_result[questions_result['success'] == False] if not  type(questions_result) is str else ''
-     form_mapping_result_failures = form_mapping_result[form_mapping_result['success'] == False] if not  type(form_mapping_result) is str else ''
-     orm_result_failures = orm_result[orm_result['success'] == False] if not  type(orm_result) is str else ''
-     skip_logic_result_failures = skip_logic_result[skip_logic_result['success'] == False] if not  type(skip_logic_result) is str else ''
+     form_result_failures = form_result[form_result['success'] == False].to_markdown() if not type(form_result) is str else ''
+     questions_result_failures = questions_result[questions_result['success'] == False].to_markdown() if not  type(questions_result) is str else ''
+     form_mapping_result_failures = form_mapping_result[form_mapping_result['success'] == False].to_markdown() if not  type(form_mapping_result) is str else ''
+     orm_result_failures = orm_result[orm_result['success'] == False].to_markdown() if not  type(orm_result) is str else ''
+     skip_logic_result_failures = skip_logic_result[skip_logic_result['success'] == False].to_markdown() if not  type(skip_logic_result) is str else ''
+     print ("Form Failures")
      print(form_result_failures)
-     print(form_mapping_result_failures)
+     print("Question Failures")
      print(questions_result_failures)
+     print ("Form Mapping Failures")
+     print(form_mapping_result_failures)
+     print ("ORM Failures")
      print(orm_result_failures)
+     print ("Skip Logic Failures")
      print(skip_logic_result_failures)
 
 def upload_all_files_in_folder(url_to_query,salesforce_service_url,auth_header,workingDirectory):
