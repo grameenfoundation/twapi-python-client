@@ -10,7 +10,7 @@ auth_header = "OAuth " + sys.argv[3]
 workingDirectory = sys.argv[4]
 form_name_to_download = sys.argv[5]
 
-get_all_dataframes_and_write_to_excel_from_form_name(url_to_query,salesforce_service_url,auth_header,workingDirectory,form_name_to_download,True)
+get_all_dataframes_and_write_to_excel_from_form_name(url_to_query,salesforce_service_url,auth_header,workingDirectory,form_name_to_download,None)
 
 # Call With
 # > python3 download_one_form.py org_url salesforce_url auth_header workingDir form_name

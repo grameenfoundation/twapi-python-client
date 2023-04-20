@@ -2,24 +2,12 @@ import pandas as pd
 import xlsxwriter
 from lib.shared_utilities import get_pandas_dataframe_from_json_web_call, get_version_changelog_from_form_name, upload_payload_to_url, get_all_questions_in_org_then_filter
 
-def get_all_dataframes_and_write_to_excel_from_form_name(url_to_query,salesforce_service_url,auth_header,workingDirectory,form_name_to_download,persistent_full_question_dataframe, form_has_more_than_100_questions=False):
+def get_all_dataframes_and_write_to_excel_from_form_name(url_to_query,salesforce_service_url,auth_header,workingDirectory,form_name_to_download,persistent_full_question_dataframe):
     form_version_id, changelog_number, form_id, form_external_id, form_dataframe = get_version_changelog_from_form_name(url_to_query,salesforce_service_url,auth_header,form_name_to_download)
     
     # Get All Questions
-    if (not form_has_more_than_100_questions):
-        question_endpoint = salesforce_service_url + "questiondata/v1?objectType=GetQuestionData&formVersionId=" + form_version_id
-        question_dataframe = pd.DataFrame(columns=['externalId', 'id', 'name', 'caption', 'cascadingLevel',\
-            'cascadingSelect', 'controllingQuestion', 'displayRepeatSectionInTable',\
-            'dynamicOperation', 'dynamicOperationTestData', 'dynamicOperationType',\
-            'exampleOfValidResponse', 'form', 'formVersion', 'hidden', 'maximum',\
-            'minimum', 'parent', 'position', 'previousVersion', 'printAnswer',\
-            'repeatSourceValue', 'repeatTimes', 'required', 'responseValidation',\
-            'showAllQuestionOnOnePage', 'skipLogicBehavior', 'skipLogicOperator',\
-            'hint', 'testDynamicOperation', 'type', 'useCurrentTimeAsDefault',\
-            'changeLogNumber', 'options'])
-        question_dataframe = pd.concat([question_dataframe,get_pandas_dataframe_from_json_web_call(url_to_query,salesforce_service_url,question_endpoint,auth_header)])
-    else:
-        question_dataframe, persistent_full_question_dataframe = get_all_questions_in_org_then_filter(url_to_query,salesforce_service_url,auth_header,form_version_id,persistent_full_question_dataframe)
+    
+    question_dataframe, persistent_full_question_dataframe = get_all_questions_in_org_then_filter(url_to_query,salesforce_service_url,auth_header,form_version_id,persistent_full_question_dataframe)
     
     if (question_dataframe.empty):
         print("No Questions in this form")
@@ -167,7 +155,7 @@ def get_all_dataframes_and_write_to_excel_from_form_name(url_to_query,salesforce
     # skip_logic_dataframe
     # orm_dataframe
 
-
+    # Replace double quote character with safe quote in all columns
     form_dataframe_id_replaced.to_excel(writer,sheet_name='Forms',startrow=1 , startcol=0,index=False)
     questions_without_options_id_replaced.to_excel(writer,sheet_name='Questions',startrow=1 , startcol=0,index=False)
     options_dataframe_id_replaced.to_excel(writer,sheet_name='Options',startrow=1 , startcol=0,index=False)
@@ -189,6 +177,6 @@ def get_all_forms_in_org(url_to_query,salesforce_service_url,auth_header,working
         thisFormName = frame['name']
         print(thisFormName)
         
-        persistent_full_question_dataframe = get_all_dataframes_and_write_to_excel_from_form_name(url_to_query,salesforce_service_url,auth_header,workingDirectory,thisFormName, persistent_full_question_dataframe, True)
+        persistent_full_question_dataframe = get_all_dataframes_and_write_to_excel_from_form_name(url_to_query,salesforce_service_url,auth_header,workingDirectory,thisFormName, persistent_full_question_dataframe)
 
 

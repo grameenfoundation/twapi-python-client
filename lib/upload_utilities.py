@@ -7,6 +7,8 @@ import xlsxwriter
 import openpyxl
 import tabulate
 import re
+import random
+import string
 
 """## Read excel file"""
 
@@ -131,7 +133,7 @@ def func_upload_questions_with_options(url_to_query,salesforce_service_url,auth_
             if (upload_options_sanitized.empty):
                 upload_options_sanitized['externalId'] = None
             else:
-                upload_options_sanitized['externalId'] = upload_options_sanitized['name'].apply(lambda x: re.sub( '(?<!^)(?=[A-Z])', '_', x ).lower())+ "_" + upload_options_sanitized['position'].astype(str) #Replace Capital Letters with "_(lowercase letter)" to prevent duplicates from salesforce IDs
+                upload_options_sanitized['externalId'] = upload_options_sanitized['name'].apply(lambda x: re.sub( '(?<!^)(?=[A-Z])', '_', x ).lower()[:8] + ''.join(random.choices(string.ascii_lowercase + string.digits, k=8))) #Replace Capital Letters with "_(lowercase letter)" to prevent duplicates from salesforce IDs
             upload_options_sanitized = upload_options_sanitized[['name','position','caption','questionName','externalId']]
 
             upload_questions_sanitized = upload_questions_without_options.copy().fillna("")
@@ -485,38 +487,46 @@ def func_upload_skip_logic(url_to_query,salesforce_service_url,auth_header,form_
 def func_print_all_statuses_after_upload(form_result, questions_result, form_mapping_result, orm_result, skip_logic_result):
      
      pd.set_option('display.max_colwidth', None)
-     print ("Form")
-     print(form_result.to_markdown())
 
-     print ("Questions")
-     print(questions_result.to_markdown())
+     if not type(form_result) is str:
 
-     print("Form Mapping")
-     print(form_mapping_result.to_markdown())
+        print ("Form")
+        print(form_result.to_markdown())
+        print ("Form Failures")
+        form_result_failures = form_result[form_result['success'] == False].to_markdown() 
+     
+        print(form_result_failures)
 
-     print("ORM")
-     print(orm_result.to_markdown())
+     if not type(questions_result) is str:
+        print ("Questions")
+        print(questions_result.to_markdown())
+        questions_result_failures = questions_result[questions_result['success'] == False].to_markdown() if not  type(questions_result) is str else ''
+     
+        print("Question Failures")
+        print(questions_result_failures)
+     if not type(form_mapping_result) is str:
+        print("Form Mapping")
+        print(form_mapping_result.to_markdown())
+        form_mapping_result_failures = form_mapping_result[form_mapping_result['success'] == False].to_markdown() if not  type(form_mapping_result) is str else ''
+     
+        print ("Form Mapping Failures")
+        print(form_mapping_result_failures)
+     
+     if not type(orm_result) is str:
+        print("ORM")
+        print(orm_result.to_markdown())
+        orm_result_failures = orm_result[orm_result['success'] == False].to_markdown() if not  type(orm_result) is str else ''
+        print ("ORM Failures")
+        print(orm_result_failures)
 
     # NOTE: Bug IDALMSA-12051 causes the API to return "Skip Condition created successfully" when the API has actually updated instead of created. Low priority to fix as this doesn't break anything.
-     print("Skip Logic")
-     print(skip_logic_result.to_markdown())
+     if not type(skip_logic_result) is str:
+        print("Skip Logic")
+        print(skip_logic_result.to_markdown())
+        skip_logic_result_failures = skip_logic_result[skip_logic_result['success'] == False].to_markdown() if not  type(skip_logic_result) is str else ''
+        print ("Skip Logic Failures")
+        print(skip_logic_result_failures)
 
-     print ("Failures")
-     form_result_failures = form_result[form_result['success'] == False].to_markdown() if not type(form_result) is str else ''
-     questions_result_failures = questions_result[questions_result['success'] == False].to_markdown() if not  type(questions_result) is str else ''
-     form_mapping_result_failures = form_mapping_result[form_mapping_result['success'] == False].to_markdown() if not  type(form_mapping_result) is str else ''
-     orm_result_failures = orm_result[orm_result['success'] == False].to_markdown() if not  type(orm_result) is str else ''
-     skip_logic_result_failures = skip_logic_result[skip_logic_result['success'] == False].to_markdown() if not  type(skip_logic_result) is str else ''
-     print ("Form Failures")
-     print(form_result_failures)
-     print("Question Failures")
-     print(questions_result_failures)
-     print ("Form Mapping Failures")
-     print(form_mapping_result_failures)
-     print ("ORM Failures")
-     print(orm_result_failures)
-     print ("Skip Logic Failures")
-     print(skip_logic_result_failures)
 
 def upload_all_files_in_folder(url_to_query,salesforce_service_url,auth_header,workingDirectory):
     for filename in os.listdir(workingDirectory):

@@ -11,7 +11,7 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "justMyCode": true,
-            "args" : ["computing-innovation-4949-dev-ed.scratch.my.salesforce.com", "/services/apexrest/", "00D040000000NU7!AR8AQCfwa8sG6OSLu_HFHcwnU1BBXM8_uQyqjL_24mUrjxNqrTCnT34vBe5k8KTEyWcuQ2eJ0DD_2W.EZ4b5rI_q81PlJWnY", "example-test-forms/", "SISTEMA SALE04 - Data Collection & Quote.xlsx"]
+            "args" : ["efficiency-force-9536-dev-ed.scratch.my.salesforce.com", "/services/apexrest/", "00D010000008hwe!AQwAQFOcEQLgfKKksiinfVcLb1OhhSG4l85EWPHiLWHVYMKnvOUeGDkOzdL8tbL2ffUPTJ41I3n2Iel.S7I_SfQ.w4LVBu13", "example-test-forms/working/", "Solar Sister Bank Deposit v6.xlsx"]
         }
     ]
 }
