@@ -2,7 +2,7 @@ import pandas as pd
 import xlsxwriter
 from lib.shared_utilities import get_pandas_dataframe_from_json_web_call, get_version_changelog_from_form_name, upload_payload_to_url, get_all_questions_in_org_then_filter
 
-def get_all_dataframes_and_write_to_excel_from_form_name(url_to_query,salesforce_service_url,auth_header,workingDirectory,form_name_to_download,persistent_full_question_dataframe):
+def get_all_dataframes_and_write_to_excel_from_form_name(url_to_query,salesforce_service_url,auth_header,workingDirectory,form_name_to_download,persistent_full_question_dataframe = None):
     form_version_id, changelog_number, form_id, form_external_id, form_dataframe = get_version_changelog_from_form_name(url_to_query,salesforce_service_url,auth_header,form_name_to_download)
     
     # Get All Questions
@@ -69,19 +69,13 @@ def get_all_dataframes_and_write_to_excel_from_form_name(url_to_query,salesforce
         external_id_in_salesforce = form_dataframe_id_replaced['name'][0]
     taro_id_full = external_id_in_salesforce
     taro_id_parent_form = external_id_in_salesforce
-    taro_language = 'en'
-    if ('::' in external_id_in_salesforce):
-        taro_id_parent_form = external_id_in_salesforce.split('::')[0]
-        taro_language = external_id_in_salesforce.split('::')[1]
-
-    print(taro_id_parent_form)
-    print(taro_language)
+    
     #remove taroId column, just use name for this
-    #form_dataframe_id_replaced['taroId'] = taro_id_parent_form + '::' + taro_language
     #form_dataframe_id_replaced['changeLog'] = changelog_number
     form_dataframe_id_replaced = form_dataframe_id_replaced.drop(columns=['id','externalId','formVersion'])
     questions_without_options_id_replaced = questions_without_options.copy()
-    questions_without_options_id_replaced = questions_without_options_id_replaced.rename(columns={'caption':'caption::'+taro_language})
+    #Replace relevant columns with "::" suffix if multi-language is possible
+    
     questions_id_lookup = questions_without_options_id_replaced[['id','name']].rename(columns={'name':'questionName','id':'questionId'})
     questions_without_options_id_replaced = questions_without_options_id_replaced.merge(questions_id_lookup,how="left",left_on="parent",right_on="questionId").rename(columns={'questionName':'parentName'})
     #remove taroId column, just use name for this
@@ -89,7 +83,7 @@ def get_all_dataframes_and_write_to_excel_from_form_name(url_to_query,salesforce
     questions_without_options_id_replaced.drop(columns=['externalId'],inplace=True)
     questions_without_options_id_replaced = questions_without_options_id_replaced.drop(columns=['id','changeLogNumber','form','formVersion','questionId','parent'])
     options_dataframe_id_replaced = options_dataframe.copy()
-    options_dataframe_id_replaced = options_dataframe_id_replaced.rename(columns={'caption':'caption::'+taro_language})
+    
     options_dataframe_id_replaced = options_dataframe_id_replaced.merge(questions_id_lookup,how='left',on='questionId')
     #remove taroId column, just use name for this
     # if (not options_dataframe_id_replaced.empty):
@@ -141,6 +135,19 @@ def get_all_dataframes_and_write_to_excel_from_form_name(url_to_query,salesforce
     #   orm_dataframe_id_replaced['taroId'] = None
     orm_dataframe_id_replaced.drop(columns=['externalId'],inplace=True)
     orm_dataframe_id_replaced = orm_dataframe_id_replaced.drop(columns=['id','parentSurveyMapping','childSurveyMapping','formVersion','changeLogNumber'])
+
+    #Replace "::" suffixes
+    taro_language = 'en'
+    if ('::' in external_id_in_salesforce):
+        taro_id_parent_form = external_id_in_salesforce.split('::')[0]
+        taro_language = external_id_in_salesforce.split('::')[1]
+
+    print(taro_id_parent_form)
+    print(taro_language) 
+    form_dataframe_id_replaced.rename(columns={'name':'name::'+taro_language,'alias':'alias::'+taro_language,'messageAfterSubmission':'messageAfterSubmission::'+taro_language,'description':'description::'+taro_language}, inplace=True)
+    questions_without_options_id_replaced.rename(columns={'caption':'caption::'+taro_language,'dynamicOperation':'dynamicOperation::'+taro_language,'dynamicOperationTestData':'dynamicOperationTestData::'+taro_language,'exampleOfValidResponse':'exampleOfValidResponse::'+taro_language,'responseValidation':'responseValidation::'+taro_language,'hint':'hint::'+taro_language},inplace=True)
+    options_dataframe_id_replaced = options_dataframe_id_replaced.rename(columns={'caption':'caption::'+taro_language},inplace=True)
+    skip_logic_dataframe_id_replaced = skip_logic_dataframe_id_replaced.rename(columns={'skipValue':'skipValue::'+taro_language},inplace=True)
     # Write an excel sheet
     form_name_to_write = form_name_to_download.replace("/","_").replace("\\","_") + ".xlsx"
     writer = pd.ExcelWriter(workingDirectory + "/" + form_name_to_write,engine='xlsxwriter')
