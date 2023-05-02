@@ -15,14 +15,14 @@ import string
 def func_read_excel_file_and_upload(url_to_query,salesforce_service_url,auth_header,workingDirectory, fileName):
         
         # Read excel file into dataframes
-        xls = pd.ExcelFile(workingDirectory + fileName)
-        upload_form_dataframe = pd.read_excel(xls, 'Forms',header=1)
-        upload_questions_without_options = pd.read_excel(xls, 'Questions', header=1)
-        upload_options = pd.read_excel(xls, 'Options', header=1)
-        upload_question_mapping = pd.read_excel(xls, 'Question_Mappings', header=1)
-        upload_field_mapping_no_question_mapping = pd.read_excel(xls, 'Field_Mappings', header=1)
-        upload_skip_logic = pd.read_excel(xls, 'Skip_Logic', header=1)
-        upload_orm = pd.read_excel(xls, 'Object_Relationship_Mappings', header=1)
+        xls = pd.ExcelFile(os.path.join(workingDirectory,fileName))
+        upload_form_dataframe = pd.read_excel(xls, 'Forms',header=0)
+        upload_questions_without_options = pd.read_excel(xls, 'Questions', header=0)
+        upload_options = pd.read_excel(xls, 'Options', header=0)
+        upload_question_mapping = pd.read_excel(xls, 'Question_Mappings', header=0)
+        upload_field_mapping_no_question_mapping = pd.read_excel(xls, 'Field_Mappings', header=0)
+        upload_skip_logic = pd.read_excel(xls, 'Skip_Logic', header=0)
+        upload_orm = pd.read_excel(xls, 'Object_Relationship_Mappings', header=0)
 
         form_result, form_name_to_upload = func_upload_form(url_to_query,salesforce_service_url,auth_header,upload_form_dataframe)
         existing_questions_lookup, existing_options_lookup, questions_without_options = func_fetch_existing_questions(url_to_query,salesforce_service_url,auth_header,form_name_to_upload)

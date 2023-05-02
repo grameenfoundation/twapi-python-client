@@ -92,6 +92,7 @@ def get_all_dataframes_and_write_to_excel_from_form_name(url_to_query,salesforce
     #     options_dataframe_id_replaced['taroId'] = None
     options_dataframe_id_replaced.drop(columns=['externalId'],inplace=True)
     options_dataframe_id_replaced = options_dataframe_id_replaced.drop(columns=['id','questionId'])
+    options_dataframe_id_replaced = options_dataframe_id_replaced.sort_values(by=["questionName","position"])
     field_mapping_without_questions_id_replaced = field_mapping_without_questions.copy()
     field_mapping_without_questions_id_replaced = field_mapping_without_questions_id_replaced.merge(questions_id_lookup,how="left",left_on="repeat",right_on="questionId")
     field_mapping_id_lookup = field_mapping_without_questions_id_replaced[['id','name']].rename(columns={'id':'fieldMappingId','name':'fieldMappingName'})
@@ -163,13 +164,13 @@ def get_all_dataframes_and_write_to_excel_from_form_name(url_to_query,salesforce
     # orm_dataframe
 
     # Replace double quote character with safe quote in all columns
-    form_dataframe_id_replaced.to_excel(writer,sheet_name='Forms',startrow=1 , startcol=0,index=False)
-    questions_without_options_id_replaced.to_excel(writer,sheet_name='Questions',startrow=1 , startcol=0,index=False)
-    options_dataframe_id_replaced.to_excel(writer,sheet_name='Options',startrow=1 , startcol=0,index=False)
-    question_mapping_dataframe_id_replaced.to_excel(writer,sheet_name='Question_Mappings',startrow=1 , startcol=0,index=False)
-    field_mapping_without_questions_id_replaced.to_excel(writer,sheet_name='Field_Mappings',startrow=1 , startcol=0,index=False)
-    skip_logic_dataframe_id_replaced.to_excel(writer,sheet_name='Skip_Logic',startrow=1 , startcol=0,index=False)
-    orm_dataframe_id_replaced.to_excel(writer,sheet_name='Object_Relationship_Mappings',startrow=1 , startcol=0,index=False)
+    form_dataframe_id_replaced.to_excel(writer,sheet_name='Forms', startcol=0,index=False)
+    questions_without_options_id_replaced.to_excel(writer,sheet_name='Questions', startcol=0,index=False)
+    options_dataframe_id_replaced.to_excel(writer,sheet_name='Options', startcol=0,index=False)
+    question_mapping_dataframe_id_replaced.to_excel(writer,sheet_name='Question_Mappings', startcol=0,index=False)
+    field_mapping_without_questions_id_replaced.to_excel(writer,sheet_name='Field_Mappings', startcol=0,index=False)
+    skip_logic_dataframe_id_replaced.to_excel(writer,sheet_name='Skip_Logic', startcol=0,index=False)
+    orm_dataframe_id_replaced.to_excel(writer,sheet_name='Object_Relationship_Mappings', startcol=0,index=False)
     writer.close()
     return persistent_full_question_dataframe
 

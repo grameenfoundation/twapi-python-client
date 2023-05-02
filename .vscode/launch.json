@@ -11,7 +11,13 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "justMyCode": true,
-            "args" : ["efficiency-force-9536-dev-ed.scratch.my.salesforce.com", "/services/apexrest/", "00D010000008hwe!AQwAQFOcEQLgfKKksiinfVcLb1OhhSG4l85EWPHiLWHVYMKnvOUeGDkOzdL8tbL2ffUPTJ41I3n2Iel.S7I_SfQ.w4LVBu13", "example-test-forms/working/", "Solar Sister Bank Deposit v6.xlsx"]
+            //Sandbox org
+            //"args":["pfi--tarotest2.sandbox.my.salesforce.com","/services/apexrest/twapi/", "00D030000008r5m!ARoAQIGOzsZOFh9Yl4sXaXuf0HWM5gtMCiyXlXiYfm1INn.boZDoiCzfALx81obDIZ7PJzJSErVvEzwa.URM5oeyW72Y0UUv","downloaded","Update contact data_en_final"]
+            //Test org
+            //"args" : ["flow-computing-1567-dev-ed.scratch.my.salesforce.com", "/services/apexrest/", "00D8K00000013eO!AQwAQARnnhAMq9fWN0kLyR5jlv.n9_UH3lph2qJeONSr1uH_LjktSKC.nltsXP1vdtECrWsfJX5rEvMWxABVZez9ye0_JWTR", "unsquished", "Update contact data_en_final.xlsx"]
+            //"args":["squished","unsquished"]
+            "args":["downloaded","squished"]
+            
         }
     ]
 }
