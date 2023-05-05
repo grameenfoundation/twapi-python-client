@@ -1,5 +1,6 @@
 import pandas as pd
 import xlsxwriter
+import html
 from lib.shared_utilities import get_pandas_dataframe_from_json_web_call, get_version_changelog_from_form_name, upload_payload_to_url, get_all_questions_in_org_then_filter
 
 def get_all_dataframes_and_write_to_excel_from_form_name(url_to_query,salesforce_service_url,auth_header,workingDirectory,form_name_to_download,persistent_full_question_dataframe = None):
@@ -17,7 +18,7 @@ def get_all_dataframes_and_write_to_excel_from_form_name(url_to_query,salesforce
     for index, frame in question_dataframe.iterrows():
         if (frame.options):
           questionId = frame.id
-          individual_option_df = pd.read_json(str(frame.options).replace('\'','"'))
+          individual_option_df = pd.DataFrame(frame.options)
           individual_option_df['questionId'] = questionId
           options_dataframe = pd.concat([individual_option_df,options_dataframe])
     questions_without_options = question_dataframe.loc[:, question_dataframe.columns != 'options']
@@ -144,6 +145,9 @@ def get_all_dataframes_and_write_to_excel_from_form_name(url_to_query,salesforce
     #   orm_dataframe_id_replaced['taroId'] = None
     orm_dataframe_id_replaced.drop(columns=['externalId'],inplace=True)
     orm_dataframe_id_replaced = orm_dataframe_id_replaced.drop(columns=['id','parentSurveyMapping','childSurveyMapping','formVersion','changeLogNumber'])
+
+    # Remove HTML special characters
+    questions_without_options_id_replaced.dynamicOperation = questions_without_options_id_replaced.dynamicOperation.apply(html.unescape)
 
     #Replace "::" suffixes
     taro_language = 'en'

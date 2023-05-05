@@ -49,11 +49,9 @@ def get_pandas_dataframe_from_json_web_call(url_to_query,salesforce_service_url,
     conn.request("GET",  endpoint_to_hit, payload, headers)
     res = conn.getresponse()
     data = res.read()
-    decoded_form_data = data.decode("utf-8").replace("\'","’") #Sanitize any single quotes before these are transformed later
+    decoded_form_data = data.decode("utf-8") 
     data_obj = json.loads(decoded_form_data)
     records_dataframe = pd.json_normalize(data_obj, record_path =['records'])
-    # Sanitize any double quote characters 
-    records_dataframe = records_dataframe.replace('"','”', regex=True)
 
     return records_dataframe
 
