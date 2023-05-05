@@ -82,6 +82,9 @@ def get_all_dataframes_and_write_to_excel_from_form_name(url_to_query,salesforce
     #questions_without_options_id_replaced['taroId'] = questions_without_options_id_replaced.apply(lambda x: str(x['externalId']) if x['externalId'] else x['name'], axis=1)
     questions_without_options_id_replaced.drop(columns=['externalId'],inplace=True)
     questions_without_options_id_replaced = questions_without_options_id_replaced.drop(columns=['id','changeLogNumber','form','formVersion','questionId','parent'])
+    #Merge on repeatSource
+    questions_without_options_id_replaced = questions_without_options_id_replaced.merge(questions_id_lookup,how="left",left_on="repeatSourceValue",right_on="questionId").rename(columns={'questionName':'repeatSourceValueName'}).drop(columns=['repeatSourceValue','questionId'])
+    questions_without_options_id_replaced = questions_without_options_id_replaced.merge(questions_id_lookup,how="left",left_on="controllingQuestion",right_on="questionId").rename(columns={'questionName':'controllingQuestionName'}).drop(columns=['controllingQuestion','questionId'])
     options_dataframe_id_replaced = options_dataframe.copy()
     
     options_dataframe_id_replaced = options_dataframe_id_replaced.merge(questions_id_lookup,how='left',on='questionId')
@@ -124,8 +127,13 @@ def get_all_dataframes_and_write_to_excel_from_form_name(url_to_query,salesforce
     else:
         skip_logic_dataframe_id_replaced['name'] = None
     skip_logic_dataframe_id_replaced.drop(columns=['externalId'],inplace=True)
-    #skip_logic_dataframe_id_replaced = skip_logic_dataframe_id_replaced.rename(columns = {'externalId':'taroId'})
     skip_logic_dataframe_id_replaced = skip_logic_dataframe_id_replaced.drop(columns=['id','parentQuestion','sourceQuestion','form','formVersion','changeLogNumber'])
+    # find any cases where the "skipvalue" column has an ID of an option; if so, use the option name instead
+    skip_logic_dataframe_id_replaced = skip_logic_dataframe_id_replaced.merge(options_dataframe[['id','name']].rename(columns={'name':'optionName'}),how="left",left_on="skipValue",right_on="id")
+    if (not skip_logic_dataframe_id_replaced.empty):
+        skip_logic_dataframe_id_replaced['skipValueName'] = skip_logic_dataframe_id_replaced.apply(lambda x: str(x['optionName']) if (x['optionName'] != '' and not pd.isnull(x['optionName']))  else ('' if pd.isnull(x['skipValue']) else x['skipValue']), axis=1)
+        skip_logic_dataframe_id_replaced = skip_logic_dataframe_id_replaced.drop(columns=['skipValue','id','optionName'])
+    #skip_logic_dataframe_id_replaced = skip_logic_dataframe_id_replaced.rename(columns = {'externalId':'taroId'})
     orm_dataframe_id_replaced = orm_dataframe.copy()
     orm_dataframe_id_replaced = orm_dataframe_id_replaced.merge(field_mapping_id_lookup.rename(columns={'fieldMappingName':'parentSurveyName'}),how='left',left_on='parentSurveyMapping',right_on='fieldMappingId').drop(columns=['fieldMappingId'])
     orm_dataframe_id_replaced = orm_dataframe_id_replaced.merge(field_mapping_id_lookup.rename(columns={'fieldMappingName':'childSurveyName'}),how='left',left_on='childSurveyMapping',right_on='fieldMappingId').drop(columns=['fieldMappingId'])
@@ -148,7 +156,7 @@ def get_all_dataframes_and_write_to_excel_from_form_name(url_to_query,salesforce
     form_dataframe_id_replaced.rename(columns={'name':'name::'+taro_language,'alias':'alias::'+taro_language,'messageAfterSubmission':'messageAfterSubmission::'+taro_language,'description':'description::'+taro_language}, inplace=True)
     questions_without_options_id_replaced.rename(columns={'caption':'caption::'+taro_language,'dynamicOperation':'dynamicOperation::'+taro_language,'dynamicOperationTestData':'dynamicOperationTestData::'+taro_language,'exampleOfValidResponse':'exampleOfValidResponse::'+taro_language,'responseValidation':'responseValidation::'+taro_language,'hint':'hint::'+taro_language},inplace=True)
     options_dataframe_id_replaced.rename(columns={'caption':'caption::'+taro_language},inplace=True)
-    skip_logic_dataframe_id_replaced.rename(columns={'skipValue':'skipValue::'+taro_language},inplace=True)
+    skip_logic_dataframe_id_replaced.rename(columns={'skipValueName':'skipValueName::'+taro_language},inplace=True)
     # Write an excel sheet
     form_name_to_write = form_name_to_download.replace("/","_").replace("\\","_") + ".xlsx"
     writer = pd.ExcelWriter(workingDirectory + "/" + form_name_to_write,engine='xlsxwriter')
