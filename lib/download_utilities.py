@@ -146,7 +146,10 @@ def get_all_dataframes_and_write_to_excel_from_form_name(url_to_query,salesforce
     orm_dataframe_id_replaced.drop(columns=['externalId'],inplace=True)
     orm_dataframe_id_replaced = orm_dataframe_id_replaced.drop(columns=['id','parentSurveyMapping','childSurveyMapping','formVersion','changeLogNumber'])
 
+
     # Remove HTML special characters
+        #First replace newlines with newline unicode so this gets replaced properly
+    questions_without_options_id_replaced.dynamicOperation = questions_without_options_id_replaced.dynamicOperation.str.replace('\n','&#10;')
     questions_without_options_id_replaced.dynamicOperation = questions_without_options_id_replaced.dynamicOperation.apply(html.unescape)
 
     #Replace "::" suffixes

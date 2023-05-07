@@ -91,7 +91,7 @@ def get_all_questions_in_org_then_filter(url_to_query,salesforce_service_url,aut
             'hint', 'testDynamicOperation', 'type', 'useCurrentTimeAsDefault',\
             'changeLogNumber', 'options'])
         while (moreQuestionsLeft):
-            question_endpoint = salesforce_service_url + "questiondata/v1?objectType=GetQuestionData&limit=" + str(limit) + "&offset=" + str(offset)
+            question_endpoint = salesforce_service_url + "questiondata/v1?objectType=GetQuestionData&limit=" + str(limit) + "&offset=" + str(offset) + "&formVersionId=" + form_version_id
             try:
                 temp_question_dataframe = get_pandas_dataframe_from_json_web_call(url_to_query,salesforce_service_url,question_endpoint,auth_header)
                 question_dataframe = pd.concat([question_dataframe,temp_question_dataframe])
