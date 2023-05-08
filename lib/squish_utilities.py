@@ -43,7 +43,8 @@ def squishFiles(files, source_folder, destination_folder):
     writer = pd.ExcelWriter(os.path.join(destination_folder,squished_file_name), engine='xlsxwriter')
     # Loop through each sheet and combine the data from all files for that sheet
     for sheet in sheets:
-        combined_data = pd.DataFrame()
+        language_not_important_data = pd.DataFrame()
+        language_specific_data = pd.DataFrame()
         for file in files:
             # Extract the language from the file name
             language = file.split('_')[-2]
@@ -55,38 +56,43 @@ def squishFiles(files, source_folder, destination_folder):
             sheet_data = pd.read_excel(xl, sheet_name=sheet,header=0)
             warning_has_been_thrown = False
             for column in sheet_data.columns:
-                    new_name = column
-                    if ('::' in column):
-                        new_name = column.split('::')[0] + "::" + language
 
-                    combined_data_length = len(combined_data.index)
+                    combined_data_length = len(language_not_important_data.index)
                     new_data_length = len(sheet_data.index)
                     if ((warning_has_been_thrown == False) and (combined_data_length > 0) and (combined_data_length != new_data_length)):
                         error_output = pd.concat([error_output, pd.DataFrame({'message':[ "WARNING - data length mismatch. This likely means your translated forms have incompatible configurations"]})])
-                        combined_column_to_compare = combined_data.iloc[:,0]
+                        combined_column_to_compare = language_not_important_data.iloc[:,0]
                         sheet_data_to_compare = sheet_data.iloc[:,0]
                         if (sheet == "Options"):
-                            combined_column_to_compare = combined_data[['questionName','position']]
+                            combined_column_to_compare = language_not_important_data[['questionName','position']]
                             sheet_data_to_compare = sheet_data[['questionName','position']]
                         
                         if (sheet == "Question_Mappings"):
-                            combined_column_to_compare = combined_data[['questionName','fieldAPIName']]
+                            combined_column_to_compare = language_not_important_data[['questionName','fieldAPIName']]
                             sheet_data_to_compare = sheet_data[['questionName','fieldAPIName']]
                         
                         difference = pd.concat([combined_column_to_compare,sheet_data_to_compare]).drop_duplicates(keep=False)
                         error_output = pd.concat([error_output, pd.DataFrame({'message':[ "Difference:"]})])
                         error_output = pd.concat([error_output, difference]) 
                         error_output = pd.concat([error_output, pd.DataFrame({'message':[ "Current data:"]})])
-                        error_output = pd.concat([error_output, combined_data])
+                        error_output = pd.concat([error_output, language_not_important_data])
                         error_output = pd.concat([error_output, pd.DataFrame({'message':[ "New data that is incompatible:"]})])
                         error_output = pd.concat([error_output, sheet_data])
                         warning_has_been_thrown = True
                     # Append the language column to the sheet data
-                    combined_data[new_name] = sheet_data[column]
+
+                    new_name = column
+                    if ('::' in column):
+                        new_name = column.split('::')[0] + "::" + language
+                        language_specific_data[new_name] = sheet_data[column]
+                    else:
+                        language_not_important_data[new_name] = sheet_data[column]
                     
-            
-        # Write the combined data for this sheet to a new sheet in the squished file
+        # Concatenate horizontally for language-dependent and language-independent dataframes
+        combined_data = pd.concat([language_not_important_data, language_specific_data], axis=1)
+
         
+        # Write the combined data for this sheet to a new sheet in the squished file
         combined_data.to_excel(writer, sheet_name=sheet, index=False, startrow=0, startcol=0)
     print(f"Squished file written to {squished_file_name}")
     writer.close()

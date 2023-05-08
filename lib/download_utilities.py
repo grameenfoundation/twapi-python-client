@@ -134,6 +134,7 @@ def get_all_dataframes_and_write_to_excel_from_form_name(url_to_query,salesforce
     if (not skip_logic_dataframe_id_replaced.empty):
         skip_logic_dataframe_id_replaced['skipValueName'] = skip_logic_dataframe_id_replaced.apply(lambda x: str(x['optionName']) if (x['optionName'] != '' and not pd.isnull(x['optionName']))  else ('' if pd.isnull(x['skipValue']) else x['skipValue']), axis=1)
         skip_logic_dataframe_id_replaced = skip_logic_dataframe_id_replaced.drop(columns=['skipValue','id','optionName'])
+    skip_logic_dataframe_id_replaced = skip_logic_dataframe_id_replaced.sort_values(by=['sourceQuestionName','parentQuestionName'])
     #skip_logic_dataframe_id_replaced = skip_logic_dataframe_id_replaced.rename(columns = {'externalId':'taroId'})
     orm_dataframe_id_replaced = orm_dataframe.copy()
     orm_dataframe_id_replaced = orm_dataframe_id_replaced.merge(field_mapping_id_lookup.rename(columns={'fieldMappingName':'parentSurveyName'}),how='left',left_on='parentSurveyMapping',right_on='fieldMappingId').drop(columns=['fieldMappingId'])
