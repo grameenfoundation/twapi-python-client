@@ -164,7 +164,7 @@ def get_all_dataframes_and_write_to_excel_from_form_name(url_to_query,salesforce
     form_dataframe_id_replaced.rename(columns={'name':'name::'+taro_language,'alias':'alias::'+taro_language,'messageAfterSubmission':'messageAfterSubmission::'+taro_language,'description':'description::'+taro_language}, inplace=True)
     questions_without_options_id_replaced.rename(columns={'caption':'caption::'+taro_language,'dynamicOperation':'dynamicOperation::'+taro_language,'dynamicOperationTestData':'dynamicOperationTestData::'+taro_language,'exampleOfValidResponse':'exampleOfValidResponse::'+taro_language,'responseValidation':'responseValidation::'+taro_language,'hint':'hint::'+taro_language},inplace=True)
     options_dataframe_id_replaced.rename(columns={'caption':'caption::'+taro_language},inplace=True)
-    skip_logic_dataframe_id_replaced.rename(columns={'skipValueName':'skipValueName::'+taro_language},inplace=True)
+    #skip_logic_dataframe_id_replaced.rename(columns={'skipValueName':'skipValueName::'+taro_language},inplace=True)
     # Write an excel sheet
     form_name_to_write = form_name_to_download.replace("/","_").replace("\\","_") + ".xlsx"
     writer = pd.ExcelWriter(workingDirectory + "/" + form_name_to_write,engine='xlsxwriter')
