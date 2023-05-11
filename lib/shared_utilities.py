@@ -49,6 +49,9 @@ def get_pandas_dataframe_from_json_web_call(url_to_query,salesforce_service_url,
     conn.request("GET",  endpoint_to_hit, payload, headers)
     res = conn.getresponse()
     data = res.read()
+    if (b"record" not in data):
+        print("Records not found " + str(endpoint_to_hit))
+        print(data)
     decoded_form_data = data.decode("utf-8") 
     data_obj = json.loads(decoded_form_data)
     records_dataframe = pd.json_normalize(data_obj, record_path =['records'])
@@ -67,7 +70,8 @@ def upload_payload_to_url(url_to_query,salesforce_service_url, auth_header, endp
       decoded_form_data = data.decode("utf-8")
       data_obj = json.loads(decoded_form_data)
       results_dataframe = pd.json_normalize(data_obj)
-      print(data.decode("utf-8"))
+      if (b"record" not in data):
+        print(data.decode("utf-8"))
       return results_dataframe
 
 
@@ -75,7 +79,7 @@ def upload_payload_to_url(url_to_query,salesforce_service_url, auth_header, endp
 # Instead, iterate through all questions in the org and make a giant dataframe, then filter it by just the relevant ones
 def get_all_questions_in_org_then_filter(url_to_query,salesforce_service_url,auth_header,form_version_id,persistent_full_question_dataframe ):
     
-    limit = 50
+    limit = 10
     offset = 0
     
     if (persistent_full_question_dataframe is None):

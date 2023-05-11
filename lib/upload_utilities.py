@@ -74,7 +74,7 @@ def func_upload_form(url_to_query,salesforce_service_url,auth_header,upload_form
 
         #This will only upload 1 form
         upload_str = str(upload_form_dataframe_relevant_columns.T.astype(str).to_json(force_ascii=False)).replace('{"0":','{"records":[')[:-2] + ',' + formVersionString + '}]}'
-        print(upload_str)
+        #print(upload_str)
         form_update_endpoint = salesforce_service_url + 'formdata/v1?objectType=PutFormData'
         form_result = upload_payload_to_url(url_to_query,salesforce_service_url,auth_header,form_update_endpoint, upload_str)
         return form_result, form_name_to_upload
@@ -122,7 +122,7 @@ def func_upload_questions_with_or_without_options(url_to_query,salesforce_servic
         if (upload_options_sanitized.empty):
             upload_options_sanitized['externalId'] = None
         else:
-            upload_options_sanitized['externalId'] = upload_options_sanitized['name'].apply(lambda x: re.sub( '(?<!^)(?=[A-Z])', '_', x ).lower()[:8] + ''.join(random.choices(string.ascii_lowercase + string.digits, k=8))) #Replace Capital Letters with "_(lowercase letter)" to prevent duplicates from salesforce IDs
+            upload_options_sanitized['externalId'] = upload_options_sanitized.apply(lambda x: str(abs(hash(x['questionName'])) % (10 ** 8)) + str(x['position']) + re.sub( '(?<!^)(?=[A-Z])', '_', x['name'] ).lower()[:8], axis=1) #Replace Capital Letters with "_(lowercase letter)" to prevent duplicates from salesforce IDs
         upload_options_sanitized = upload_options_sanitized[['name','position','caption','questionName','externalId']]
     upload_questions_sanitized = upload_questions_without_options.copy().fillna("")
     for column in upload_questions_sanitized:
@@ -131,7 +131,7 @@ def func_upload_questions_with_or_without_options(url_to_query,salesforce_servic
             upload_questions_sanitized = upload_questions_sanitized.rename(columns={column:'caption'})
     
     if (uploading_child_questions_not_parents):
-        upload_options_sanitized = upload_options_sanitized.merge(existing_options_lookup[['id','name']],how="left",on="name").fillna("")
+        upload_options_sanitized = upload_options_sanitized.merge(existing_options_lookup[['id','externalId']],how="left",on="externalId").fillna("")
 
     # Fetch latest form ID and changelog from the API
     form_version_id, changelog_number, form_id, form_external_id, form_dataframe = get_version_changelog_from_form_name(url_to_query,salesforce_service_url,auth_header,form_name_to_upload)
@@ -154,9 +154,9 @@ def func_upload_questions_with_or_without_options(url_to_query,salesforce_servic
                 for questionName in options_associated_with_questions.items():
                     thisQuestionName = questionName[1]
                     upload_options_json = str(upload_options_sanitized[upload_options_sanitized['questionName'] == thisQuestionName][['externalId','id','name','position','caption']].to_json(orient='records',force_ascii=False))
-                    print(upload_options_json)
+                    #print(upload_options_json)
                     row_index = upload_questions_with_options.index[upload_questions_with_options['name'] == thisQuestionName ].tolist()[0]
-                    print(row_index)
+                    #print(row_index)
                     upload_questions_with_options.at[row_index,'options']= upload_options_json
 
         upload_questions_with_options = upload_questions_with_options.merge( \
@@ -269,8 +269,8 @@ def func_read_existing_field_and_form_mappings(url_to_query,salesforce_service_u
         #Iterate all form mappings that have question mappings and create a new dataframe that has just the question mappings
         question_mapping_dataframe = pd.DataFrame(columns=["externalId", "name", "id", "fieldAPIName","isBroken","question","scoringGroup"])
         for index, frame in field_mapping_dataframe.iterrows():
-            if (frame.questionMappings):
-                print(str(frame.questionMappings).replace('\'','"'))
+            # if (frame.questionMappings):
+            #     print(str(frame.questionMappings).replace('\'','"'))
             field_mapping_id = frame.id
             #JSON is case-sensitive, python apparently converts it into uppercase
             individual_question_mapping_df = pd.DataFrame(frame.questionMappings) 
@@ -305,11 +305,11 @@ def func_upload_field_and_form_mappings(url_to_query,salesforce_service_url,auth
         if (not question_mapping_associated_with_field_mapping.empty):
             for field_mapping_name in question_mapping_associated_with_field_mapping.items():
                 thisFieldMapping = field_mapping_name[1]
-                print(thisFieldMapping)
+                # print(thisFieldMapping)
                 upload_question_mapping_json = str(upload_question_mapping_with_ids[upload_question_mapping_with_ids['fieldMappingName'] == thisFieldMapping][['externalId', 'name', 'id', 'fieldAPIName', 'isBroken','question', 'scoringGroup']].to_json(orient='records',force_ascii=False))
-                print(upload_question_mapping_json)
+                # print(upload_question_mapping_json)
                 row_index = upload_field_mapping_with_question_mapping.index[upload_field_mapping_with_question_mapping['name'] == thisFieldMapping ].tolist()[0]
-                print(row_index)
+                # print(row_index)
                 upload_field_mapping_with_question_mapping.at[row_index,'questionMappings']= upload_question_mapping_json
 
         upload_field_mapping_with_question_mapping['form'] = form_id
@@ -326,7 +326,7 @@ def func_upload_field_and_form_mappings(url_to_query,salesforce_service_url,auth
             'isReference', 'matchingField', 'repeat', 
             'submissionAPIField', 'changeLogNumber', 'questionMappings']].astype(str).to_json(orient="records",force_ascii=False)).replace('\\','')\
             .replace('"[{"','[{"').replace(']"}',']}') + "}"
-        print(upload_field_mapping_string)
+        # print(upload_field_mapping_string)
 
         if (upload_field_mapping_with_question_mapping.empty):
             form_mapping_result = "No Form Mapping to upload"
@@ -395,9 +395,22 @@ def func_upload_skip_logic(url_to_query,salesforce_service_url,auth_header,form_
         skip_logic_dataframe = pd.DataFrame(columns=["externalId" ,"id" ,"negate" ,"skipValue" ,"condition" ,"parentQuestion" ,"sourceQuestion" ,"form" ,"formVersion" ,"changeLogNumber"])
         skip_logic_dataframe = pd.concat([skip_logic_dataframe, get_pandas_dataframe_from_json_web_call(url_to_query,salesforce_service_url,skip_logic_endpoint, auth_header)])
 
-        skip_logic_dataframe['joinColumn'] = skip_logic_dataframe['parentQuestion'] + '-' + skip_logic_dataframe['sourceQuestion']
+        # Lookup the options that may be associated with this skip logic
+                                                 
+        # 1. create join column 'questionName', 'optionName'
+        existing_options_lookup['optionsJoinColumn'] = existing_options_lookup['questionName'] +'-' + existing_options_lookup['name']
+        # 2. create join column for skip logic of 'source_question_name', 'skipvaluename'
+        upload_skip_logic_referencing_new_ids['optionsJoinColumn'] = upload_skip_logic_referencing_new_ids['sourceQuestionName'] + '-' + upload_skip_logic_referencing_new_ids['skipValueName']
+        
+        # 3. join on join column, add extra column to skip logic
+        upload_skip_logic_referencing_new_ids = upload_skip_logic_referencing_new_ids.merge(existing_options_lookup[['id','optionsJoinColumn']].rename(columns={'id':'optionId'}),how="left",on="optionsJoinColumn")
 
-        upload_skip_logic_referencing_new_ids['joinColumn'] = upload_skip_logic_referencing_new_ids['parentQuestion'] + '-' + upload_skip_logic_referencing_new_ids['sourceQuestion']
+        # 4. use lambda to replace if this exists, ignore if not
+        upload_skip_logic_referencing_new_ids['skipValue'] = upload_skip_logic_referencing_new_ids.apply(lambda x: str(x['optionId']) if (x['optionId'] != '' and not pd.isnull(x['optionId'])) else ('' if pd.isnull(x['skipValueName']) else x['skipValueName']), axis=1)
+        
+        skip_logic_dataframe['joinColumn'] = skip_logic_dataframe['parentQuestion'] + '-' + skip_logic_dataframe['sourceQuestion'] + '-' + skip_logic_dataframe['skipValue']
+
+        upload_skip_logic_referencing_new_ids['joinColumn'] = upload_skip_logic_referencing_new_ids['parentQuestion'] + '-' + upload_skip_logic_referencing_new_ids['sourceQuestion'] + '-' + upload_skip_logic_referencing_new_ids['skipValue']
 
         # Get existing IDs and external IDs for any existing skip logic
         upload_skip_logic_referencing_new_ids_joined = upload_skip_logic_referencing_new_ids.merge(skip_logic_dataframe[['id','externalId','joinColumn']],how="left",on="joinColumn").fillna("")
@@ -409,29 +422,14 @@ def func_upload_skip_logic(url_to_query,salesforce_service_url,auth_header,form_
             upload_skip_logic_referencing_new_ids_joined['externalId'] = upload_skip_logic_referencing_new_ids_joined.apply(lambda x: str(x['externalId']) if x['externalId'] else x['joinColumn'], axis=1)
 
         
-
-        # Lookup the options that may be associated with this skip logic
-                                                 
-        # 1. create join column 'questionName', 'optionName'
-        existing_options_lookup['optionsJoinColumn'] = existing_options_lookup['questionName'] +'-' + existing_options_lookup['name']
-        # 2. create join column for skip logic of 'source_question_name', 'skipvaluename'
-        upload_skip_logic_referencing_new_ids_joined['optionsJoinColumn'] = upload_skip_logic_referencing_new_ids_joined['sourceQuestionName'] + '-' + upload_skip_logic_referencing_new_ids_joined['skipValueName']
-        
-        # 3. join on join column, add extra column to skip logic
-        upload_skip_logic_referencing_new_ids_joined = upload_skip_logic_referencing_new_ids_joined.merge(existing_options_lookup[['id','optionsJoinColumn']].rename(columns={'id':'optionId'}),how="left",on="optionsJoinColumn")
-
-        # 4. use lambda to replace if this exists, ignore if not
-        upload_skip_logic_referencing_new_ids_joined['skipValue'] = upload_skip_logic_referencing_new_ids_joined.apply(lambda x: str(x['optionId']) if (x['optionId'] != '' and not pd.isnull(x['optionId'])) else ('' if pd.isnull(x['skipValueName']) else x['skipValueName']), axis=1)
-
         upload_skip_logic = upload_skip_logic_referencing_new_ids_joined[['externalId', 'id', 'negate', 'skipValue', 'condition',
-            'parentQuestion', 'sourceQuestion']]
+                    'parentQuestion', 'sourceQuestion']]
 
         upload_skip_logic['form'] = form_id
         upload_skip_logic['formVersion'] = form_version_id
         upload_skip_logic['changeLogNumber'] = changelog_number
 
         string_to_upload = '{"records":' + upload_skip_logic.astype(str).to_json(orient="records",force_ascii=False) + '}'
-        string_to_upload
 
         form_update_endpoint = salesforce_service_url + 'skiplogicdata/v1/?objectType=PutSkipLogicData'
         if (upload_skip_logic.empty):
@@ -494,7 +492,7 @@ def func_print_all_statuses_after_upload(form_result, questions_result, form_map
             print ("Skip Logic Failures")
             print(skip_logic_result_failures.to_markdown())
             error_output = pd.concat([error_output, pd.DataFrame({'message':[ "Skip Logic Upload Errors:"]})])
-            error_output = pd.concat([error_output, orm_result_failures]) 
+            error_output = pd.concat([error_output, skip_logic_result_failures]) 
 
      if (not error_output.empty):
         error_output = pd.concat([error_output, pd.DataFrame({'message':[ 'File with errors' + file_name ]})])
