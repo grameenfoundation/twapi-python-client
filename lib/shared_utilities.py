@@ -101,7 +101,7 @@ def get_all_questions_in_org_then_filter(url_to_query,salesforce_service_url,aut
                 print(e)
                 # TODO - this is hacky AF. Call until an error is thrown, this is not best practice.
                 moreQuestionsLeft = False;
-            print("Loading All SalesForce Questions into local cache, question # " + str(offset))
+            print("Loading SalesForce Questions into local cache, question # " + str(offset))
             offset += limit
         # Save this full dataframe in a global var for future use
         persistent_full_question_dataframe = question_dataframe

@@ -25,13 +25,13 @@ def reformat_dataframe_to_single_language(original_dataframe, language_to_use):
 def write_all_to_excel(destination_directory, excel_name, form_dataframe, question_dataframe, option_dataframe, question_mapping_dataframe, field_mapping_dataframe, skip_logic_dataframe, orm_dataframe):
       writer = pd.ExcelWriter(os.path.join(destination_directory,excel_name + ".xlsx"),engine='xlsxwriter')
       workbook=writer.book
-      form_dataframe.to_excel(writer,sheet_name='Forms',startrow=0 , startcol=0)
-      question_dataframe.to_excel(writer,sheet_name='Questions',startrow=0 , startcol=0)
-      option_dataframe.to_excel(writer,sheet_name='Options',startrow=0 , startcol=0)
-      question_mapping_dataframe.to_excel(writer,sheet_name='Question_Mappings',startrow=0 , startcol=0)
-      field_mapping_dataframe.to_excel(writer,sheet_name='Field_Mappings',startrow=0 , startcol=0)
-      skip_logic_dataframe.to_excel(writer,sheet_name='Skip_Logic',startrow=0 , startcol=0)
-      orm_dataframe.to_excel(writer,sheet_name='Object_Relationship_Mappings',startrow=0 , startcol=0)
+      form_dataframe.to_excel(writer,sheet_name='Forms', index=False,startrow=0 , startcol=0)
+      question_dataframe.to_excel(writer,sheet_name='Questions',index=False,startrow=0 , startcol=0)
+      option_dataframe.to_excel(writer,sheet_name='Options',index=False,startrow=0 , startcol=0)
+      question_mapping_dataframe.to_excel(writer,sheet_name='Question_Mappings',index=False,startrow=0 , startcol=0)
+      field_mapping_dataframe.to_excel(writer,sheet_name='Field_Mappings',index=False,startrow=0 , startcol=0)
+      skip_logic_dataframe.to_excel(writer,sheet_name='Skip_Logic',index=False,startrow=0 , startcol=0)
+      orm_dataframe.to_excel(writer,sheet_name='Object_Relationship_Mappings',index=False,startrow=0 , startcol=0)
       writer.close()
 
 def unsquish_file(source_directory,destination_directory,filename):

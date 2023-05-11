@@ -9,6 +9,7 @@ import tabulate
 import re
 import random
 import string
+from datetime import datetime
 
 """## Read excel file"""
 
@@ -38,7 +39,7 @@ def func_read_excel_file_and_upload(url_to_query,salesforce_service_url,auth_hea
         upload_orm_with_replaced_id = func_read_back_field_and_form_mapping_ids(url_to_query,salesforce_service_url,auth_header,form_name_to_upload, upload_orm)
         orm_result = func_upsert_orm(url_to_query,salesforce_service_url,auth_header,form_name_to_upload, upload_orm_with_replaced_id)
         skip_logic_result = func_upload_skip_logic(url_to_query,salesforce_service_url,auth_header,form_name_to_upload, upload_skip_logic_referencing_new_ids, existing_questions_lookup, existing_options_lookup)
-        func_print_all_statuses_after_upload(form_result, questions_result, form_mapping_result, orm_result, skip_logic_result)        
+        func_print_all_statuses_after_upload(form_result, questions_result, form_mapping_result, orm_result, skip_logic_result, workingDirectory, fileName)        
 
 
 """## Form"""
@@ -441,48 +442,66 @@ def func_upload_skip_logic(url_to_query,salesforce_service_url,auth_header,form_
         return skip_logic_result
 """# Review any errors"""
 
-def func_print_all_statuses_after_upload(form_result, questions_result, form_mapping_result, orm_result, skip_logic_result):
+def func_print_all_statuses_after_upload(form_result, questions_result, form_mapping_result, orm_result, skip_logic_result, destination_folder, file_name):
      
      pd.set_option('display.max_colwidth', None)
+     error_output = pd.DataFrame()
 
      if not type(form_result) is str:
 
         print ("Form")
         print(form_result.to_markdown())
-        print ("Form Failures")
-        form_result_failures = form_result[form_result['success'] == False].to_markdown() 
-     
-        print(form_result_failures)
+        form_result_failures = form_result[form_result['success'] != True] 
+        if (not form_result_failures.empty):
+            print ("Form Failures")
+            print(form_result_failures.to_markdown())
+            error_output = pd.concat([error_output, pd.DataFrame({'message':[ "Form Errors:"]})])
+            error_output = pd.concat([error_output, form_result_failures]) 
 
      if not type(questions_result) is str:
         print ("Questions")
         print(questions_result.to_markdown())
-        questions_result_failures = questions_result[questions_result['success'] == False].to_markdown() if not  type(questions_result) is str else ''
-     
-        print("Question Failures")
-        print(questions_result_failures)
+        questions_result_failures = questions_result[questions_result['success'] != True] if not  type(questions_result) is str else pd.DataFrame()
+        if (not questions_result_failures.empty): 
+            print("Question Failures")
+            print(questions_result_failures.to_markdown())
+            error_output = pd.concat([error_output, pd.DataFrame({'message':[ "Question Errors:"]})])
+            error_output = pd.concat([error_output, questions_result_failures]) 
      if not type(form_mapping_result) is str:
         print("Form Mapping")
         print(form_mapping_result.to_markdown())
-        form_mapping_result_failures = form_mapping_result[form_mapping_result['success'] == False].to_markdown() if not  type(form_mapping_result) is str else ''
-     
-        print ("Form Mapping Failures")
-        print(form_mapping_result_failures)
-     
+        form_mapping_result_failures = form_mapping_result[form_mapping_result['success'] != True] if not  type(form_mapping_result) is str else pd.DataFrame()
+        if (not form_mapping_result_failures.empty): 
+            print ("Form Mapping Failures")
+            print(form_mapping_result_failures.to_markdown())
+            error_output = pd.concat([error_output, pd.DataFrame({'message':[ "Form Mapping Errors:"]})])
+            error_output = pd.concat([error_output, form_mapping_result_failures]) 
      if not type(orm_result) is str:
         print("ORM")
         print(orm_result.to_markdown())
-        orm_result_failures = orm_result[orm_result['success'] == False].to_markdown() if not  type(orm_result) is str else ''
-        print ("ORM Failures")
-        print(orm_result_failures)
-
+        orm_result_failures = orm_result[orm_result['success'] != True] if not  type(orm_result) is str else pd.DataFrame()
+        if (not orm_result_failures.empty):
+            print ("ORM Failures")
+            print(orm_result_failures.to_markdown())
+            error_output = pd.concat([error_output, pd.DataFrame({'message':[ "Object Relationship Mapping Errors:"]})])
+            error_output = pd.concat([error_output, orm_result_failures]) 
     # NOTE: Bug IDALMSA-12051 causes the API to return "Skip Condition created successfully" when the API has actually updated instead of created. Low priority to fix as this doesn't break anything.
      if not type(skip_logic_result) is str:
         print("Skip Logic")
         print(skip_logic_result.to_markdown())
-        skip_logic_result_failures = skip_logic_result[skip_logic_result['success'] == False].to_markdown() if not  type(skip_logic_result) is str else ''
-        print ("Skip Logic Failures")
-        print(skip_logic_result_failures)
+        skip_logic_result_failures = skip_logic_result[skip_logic_result['success'] != True] if not  type(skip_logic_result) is str else pd.DataFrame()
+        if (not skip_logic_result_failures.empty):
+            print ("Skip Logic Failures")
+            print(skip_logic_result_failures.to_markdown())
+            error_output = pd.concat([error_output, pd.DataFrame({'message':[ "Skip Logic Upload Errors:"]})])
+            error_output = pd.concat([error_output, orm_result_failures]) 
+
+     if (not error_output.empty):
+        error_output = pd.concat([error_output, pd.DataFrame({'message':[ 'File with errors' + file_name ]})])
+        error_output = pd.concat([error_output, pd.DataFrame({'message':[ 'Time: ' + datetime.today().strftime('%Y-%m-%d %H:%M:%S') ]})])
+        error_writer = pd.ExcelWriter(os.path.join(destination_folder,"error_" + file_name), engine='xlsxwriter')
+        error_output.to_excel(error_writer, sheet_name="errors", index=False, startrow=0, startcol=0)
+        error_writer.close()
 
 
 def upload_all_files_in_folder(url_to_query,salesforce_service_url,auth_header,workingDirectory):
