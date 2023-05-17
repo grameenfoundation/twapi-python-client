@@ -8,7 +8,9 @@ import openpyxl
 import tabulate
 import re
 import random
+import json
 import string
+import html
 from datetime import datetime
 
 """## Read excel file"""
@@ -157,14 +159,24 @@ def func_upload_questions_with_or_without_options(url_to_query,salesforce_servic
                     #print(upload_options_json)
                     row_index = upload_questions_with_options.index[upload_questions_with_options['name'] == thisQuestionName ].tolist()[0]
                     #print(row_index)
-                    upload_questions_with_options.at[row_index,'options']= upload_options_json
+                    upload_questions_with_options.at[row_index,'options']= json.loads(upload_options_json)
 
         upload_questions_with_options = upload_questions_with_options.merge( \
                 existing_questions_lookup[['id','name']].rename(columns={'id':'parentId','name':'parentName'}),
                 how="left",on="parentName")\
                 .rename(columns={'parentId':'parent'}).fillna('')
 
-           
+    #Replace double quotes with single quotes just for dynamic ops, captions and hints - most of the time this will be fine
+    upload_questions_with_options['dynamicOperation'] = upload_questions_with_options['dynamicOperation'].apply(html.escape)
+    upload_questions_with_options.dynamicOperation = upload_questions_with_options.dynamicOperation.str.replace('\n','&#10;').replace('\t','&#9').replace('"','&#34;').replace('"','&#34;').replace("'",'&#39;')
+    upload_questions_with_options['caption'] = upload_questions_with_options['caption'].apply(html.escape)
+    upload_questions_with_options.caption = upload_questions_with_options.caption.str.replace('\n','&#10;').replace('\t','&#9').replace('"','&#34;').replace('"','&#34;').replace("'",'&#39;')
+    upload_questions_with_options.caption = upload_questions_with_options.caption.str.slice(0,254)
+    upload_questions_with_options['hint'] = upload_questions_with_options['hint'].apply(html.escape)
+    upload_questions_with_options.hint = upload_questions_with_options.hint.str.replace('\n','&#10;').replace('\t','&#9').replace('"','&#34;').replace('"','&#34;').replace("'",'&#39;')
+    upload_questions_with_options.hint = upload_questions_with_options.hint.str.slice(0,255)
+    
+
     just_parent_sections = upload_questions_with_options[(upload_questions_without_options['type'] == 'section') | (upload_questions_without_options['type'] == 'repeat') ].reindex()
     not_parent_sections = upload_questions_with_options[(upload_questions_without_options['type'] != 'section') & (upload_questions_without_options['type'] != 'repeat') ] .reindex()
 
@@ -207,7 +219,7 @@ def func_upload_questions_with_or_without_options(url_to_query,salesforce_servic
 
         question_with_options_creation_string = '{"records":' + str(upload_questions_with_options[['externalId', 'id', 'name',
             'caption', 'cascadingLevel',
-            'cascadingSelect', 'controllingQuestion', 'displayRepeatSectionInTable',
+            'cascadingSelect', 'controllingQuestion', 'displayRepeatSectionInTable','dynamicOperation',
             'dynamicOperationType', 'exampleOfValidResponse',
             'form', 'formVersion', 'hidden', 
             'maximum',  'minimum', 'parent', 'position',
@@ -215,10 +227,10 @@ def func_upload_questions_with_or_without_options(url_to_query,salesforce_servic
             'repeatSourceValue', 'repeatTimes',
             'required', 'responseValidation', 'showAllQuestionOnOnePage',
             'skipLogicBehavior', 'skipLogicOperator', 'hint',
-            'testDynamicOperation', 'type', 'useCurrentTimeAsDefault',
-            'changeLogNumber', 'options']].iloc[minimum:maximum].to_json(orient="records",force_ascii=False))\
-            .replace('\\','').replace('"[{"','[{"').replace('"}]"','"}]').replace(',"options":""',',"options":[]')\
-            .replace('null','""').replace('"maximum":"",','').replace('"minimum":"",','').replace('"responseValidation":"",','').replace('"exampleOfValidResponse":"",','') + '}'
+            'testDynamicOperation', 'type', 'useCurrentTimeAsDefault', 'options',
+            'changeLogNumber']].iloc[minimum:maximum].to_json(orient="records",force_ascii=False))\
+            .replace("\\'","'").replace(',"options":""',',"options":[]')\
+            .replace('"maximum":"",','').replace('"minimum":"",','').replace('"responseValidation":"",','').replace('"exampleOfValidResponse":"",','') + '}'
             # question_with_options_creation_string
         questions_temp_result =  upload_payload_to_url(url_to_query,salesforce_service_url,auth_header,salesforce_service_url + 'questiondata/v1?objectType=PutQuestionData', question_with_options_creation_string)
         
