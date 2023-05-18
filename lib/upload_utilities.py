@@ -124,7 +124,7 @@ def func_upload_questions_with_or_without_options(url_to_query,salesforce_servic
         if (upload_options_sanitized.empty):
             upload_options_sanitized['externalId'] = None
         else:
-            upload_options_sanitized['externalId'] = upload_options_sanitized.apply(lambda x: str(abs(hash(x['questionName'])) % (10 ** 8)) + str(x['position']) + re.sub( '(?<!^)(?=[A-Z])', '_', x['name'] ).lower()[:8], axis=1) #Replace Capital Letters with "_(lowercase letter)" to prevent duplicates from salesforce IDs
+            upload_options_sanitized['externalId'] = upload_options_sanitized.apply(lambda x: str(x['questionName'])[-8:] + str(x['position']) + re.sub( '(?<!^)(?=[A-Z])', '_', x['name'] ).lower()[-8:], axis=1) #Replace Capital Letters with "_(lowercase letter)" to prevent duplicates from salesforce IDs
         upload_options_sanitized = upload_options_sanitized[['name','position','caption','questionName','externalId']]
     upload_questions_sanitized = upload_questions_without_options.copy().fillna("")
     for column in upload_questions_sanitized:
@@ -168,13 +168,13 @@ def func_upload_questions_with_or_without_options(url_to_query,salesforce_servic
 
     #Replace double quotes with single quotes just for dynamic ops, captions and hints - most of the time this will be fine
     upload_questions_with_options['dynamicOperation'] = upload_questions_with_options['dynamicOperation'].apply(html.escape)
-    upload_questions_with_options.dynamicOperation = upload_questions_with_options.dynamicOperation.str.replace('\n','&#10;').replace('\t','&#9').replace('"','&#34;').replace('"','&#34;').replace("'",'&#39;')
-    upload_questions_with_options['caption'] = upload_questions_with_options['caption'].apply(html.escape)
-    upload_questions_with_options.caption = upload_questions_with_options.caption.str.replace('\n','&#10;').replace('\t','&#9').replace('"','&#34;').replace('"','&#34;').replace("'",'&#39;')
-    upload_questions_with_options.caption = upload_questions_with_options.caption.str.slice(0,254)
-    upload_questions_with_options['hint'] = upload_questions_with_options['hint'].apply(html.escape)
-    upload_questions_with_options.hint = upload_questions_with_options.hint.str.replace('\n','&#10;').replace('\t','&#9').replace('"','&#34;').replace('"','&#34;').replace("'",'&#39;')
-    upload_questions_with_options.hint = upload_questions_with_options.hint.str.slice(0,255)
+    # upload_questions_with_options.dynamicOperation = upload_questions_with_options.dynamicOperation.str.replace('\n','&#10;').replace('\t','&#9').replace('"','&#34;').replace("'",'&#39;')
+    #upload_questions_with_options['caption'] = upload_questions_with_options['caption'].apply(html.escape)
+    # upload_questions_with_options.caption = upload_questions_with_options.caption.str.replace('\n','&#10;').replace('\t','&#9').replace('"','”').replace("'",'’')
+    # upload_questions_with_options.caption = upload_questions_with_options.caption.str.slice(0,254)
+    #upload_questions_with_options['hint'] = upload_questions_with_options['hint'].apply(html.escape)
+    # upload_questions_with_options.hint = upload_questions_with_options.hint.str.replace('\n','&#10;').replace('\t','&#9').replace('"','”').replace("'",'’')
+    # upload_questions_with_options.hint = upload_questions_with_options.hint.str.slice(0,254)
     
 
     just_parent_sections = upload_questions_with_options[(upload_questions_without_options['type'] == 'section') | (upload_questions_without_options['type'] == 'repeat') ].reindex()
