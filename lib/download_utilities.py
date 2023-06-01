@@ -196,11 +196,10 @@ def get_all_forms_in_org(url_to_query,salesforce_service_url,auth_header,working
     all_form_dataframe = get_pandas_dataframe_from_json_web_call(url_to_query,salesforce_service_url,all_forms_endpoint, auth_header)
 
     sorted_forms_df = all_form_dataframe.sort_values(by='id',ascending=False)
-    persistent_full_question_dataframe = None
     for index, frame in sorted_forms_df.iterrows():
         thisFormName = frame['name']
         print(thisFormName)
         
-        persistent_full_question_dataframe = get_all_dataframes_and_write_to_excel_from_form_name(url_to_query,salesforce_service_url,auth_header,workingDirectory,thisFormName, persistent_full_question_dataframe)
+        get_all_dataframes_and_write_to_excel_from_form_name(url_to_query,salesforce_service_url,auth_header,workingDirectory,thisFormName, None)
 
 
