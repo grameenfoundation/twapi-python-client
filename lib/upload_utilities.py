@@ -408,25 +408,28 @@ def func_upload_skip_logic(url_to_query,salesforce_service_url,auth_header,form_
         skip_logic_dataframe = pd.DataFrame(columns=["externalId" ,"id" ,"negate" ,"skipValue" ,"condition" ,"parentQuestion" ,"sourceQuestion" ,"form" ,"formVersion" ,"changeLogNumber"])
         skip_logic_dataframe = pd.concat([skip_logic_dataframe, get_pandas_dataframe_from_json_web_call(url_to_query,salesforce_service_url,skip_logic_endpoint, auth_header)])
 
-        # Lookup the options that may be associated with this skip logic
-                                                 
-        # 1. create join column 'questionName', 'optionName'
-        existing_options_lookup['optionsJoinColumn'] = existing_options_lookup['questionName'] +'-' + existing_options_lookup['name']
-        # 2. create join column for skip logic of 'source_question_name', 'skipvaluename'
-        upload_skip_logic_referencing_new_ids['optionsJoinColumn'] = upload_skip_logic_referencing_new_ids['sourceQuestionName'] + '-' + upload_skip_logic_referencing_new_ids['skipValueName']
-        
-        # 3. join on join column, add extra column to skip logic
-        upload_skip_logic_referencing_new_ids = upload_skip_logic_referencing_new_ids.merge(existing_options_lookup[['id','optionsJoinColumn']].rename(columns={'id':'optionId'}),how="left",on="optionsJoinColumn")
+        if (upload_skip_logic_referencing_new_ids.empty):
+            return None
+        else:
+            # Lookup the options that may be associated with this skip logic
+                                                    
+            # 1. create join column 'questionName', 'optionName'
+            existing_options_lookup['optionsJoinColumn'] = existing_options_lookup['questionName'] +'-' + existing_options_lookup['name']
+            # 2. create join column for skip logic of 'source_question_name', 'skipvaluename'
+            upload_skip_logic_referencing_new_ids['optionsJoinColumn'] = upload_skip_logic_referencing_new_ids['sourceQuestionName'] + '-' + upload_skip_logic_referencing_new_ids['skipValueName']
+            
+            # 3. join on join column, add extra column to skip logic
+            upload_skip_logic_referencing_new_ids = upload_skip_logic_referencing_new_ids.merge(existing_options_lookup[['id','optionsJoinColumn']].rename(columns={'id':'optionId'}),how="left",on="optionsJoinColumn")
 
-        # 4. use lambda to replace if this exists, ignore if not
-        upload_skip_logic_referencing_new_ids['skipValue'] = upload_skip_logic_referencing_new_ids.apply(lambda x: str(x['optionId']) if (x['optionId'] != '' and not pd.isnull(x['optionId'])) else ('' if pd.isnull(x['skipValueName']) else x['skipValueName']), axis=1)
-        
-        skip_logic_dataframe['joinColumn'] = skip_logic_dataframe['parentQuestion'] + '-' + skip_logic_dataframe['sourceQuestion'] + '-' + skip_logic_dataframe['skipValue']
+            # 4. use lambda to replace if this exists, ignore if not
+            upload_skip_logic_referencing_new_ids['skipValue'] = upload_skip_logic_referencing_new_ids.apply(lambda x: str(x['optionId']) if (x['optionId'] != '' and not pd.isnull(x['optionId'])) else ('' if pd.isnull(x['skipValueName']) else x['skipValueName']), axis=1)
+            
+            skip_logic_dataframe['joinColumn'] = skip_logic_dataframe['parentQuestion'] + '-' + skip_logic_dataframe['sourceQuestion'] + '-' + skip_logic_dataframe['skipValue']
 
-        upload_skip_logic_referencing_new_ids['joinColumn'] = upload_skip_logic_referencing_new_ids['parentQuestion'] + '-' + upload_skip_logic_referencing_new_ids['sourceQuestion'] + '-' + upload_skip_logic_referencing_new_ids['skipValue']
+            upload_skip_logic_referencing_new_ids['joinColumn'] = upload_skip_logic_referencing_new_ids['parentQuestion'] + '-' + upload_skip_logic_referencing_new_ids['sourceQuestion'] + '-' + upload_skip_logic_referencing_new_ids['skipValue']
 
-        # Get existing IDs and external IDs for any existing skip logic
-        upload_skip_logic_referencing_new_ids_joined = upload_skip_logic_referencing_new_ids.merge(skip_logic_dataframe[['id','externalId','joinColumn']],how="left",on="joinColumn").fillna("")
+            # Get existing IDs and external IDs for any existing skip logic
+            upload_skip_logic_referencing_new_ids_joined = upload_skip_logic_referencing_new_ids.merge(skip_logic_dataframe[['id','externalId','joinColumn']],how="left",on="joinColumn").fillna("")
 
         if (upload_skip_logic_referencing_new_ids_joined.empty):
             upload_skip_logic_referencing_new_ids_joined['externalId'] = None
@@ -478,7 +481,7 @@ def func_print_all_statuses_after_upload(form_result, questions_result, form_map
             print(questions_result_failures.to_markdown())
             error_output = pd.concat([error_output, pd.DataFrame({'message':[ "Question Errors:"]})])
             error_output = pd.concat([error_output, questions_result_failures]) 
-     if not type(form_mapping_result) is str:
+     if not form_mapping_result is None and not type(form_mapping_result) is str:
         print("Form Mapping")
         print(form_mapping_result.to_markdown())
         form_mapping_result_failures = form_mapping_result[form_mapping_result['success'] != True] if not  type(form_mapping_result) is str else pd.DataFrame()
@@ -487,7 +490,7 @@ def func_print_all_statuses_after_upload(form_result, questions_result, form_map
             print(form_mapping_result_failures.to_markdown())
             error_output = pd.concat([error_output, pd.DataFrame({'message':[ "Form Mapping Errors:"]})])
             error_output = pd.concat([error_output, form_mapping_result_failures]) 
-     if not type(orm_result) is str:
+     if not orm_result is None and not type(orm_result) is str:
         print("ORM")
         print(orm_result.to_markdown())
         orm_result_failures = orm_result[orm_result['success'] != True] if not  type(orm_result) is str else pd.DataFrame()
@@ -497,7 +500,7 @@ def func_print_all_statuses_after_upload(form_result, questions_result, form_map
             error_output = pd.concat([error_output, pd.DataFrame({'message':[ "Object Relationship Mapping Errors:"]})])
             error_output = pd.concat([error_output, orm_result_failures]) 
     # NOTE: Bug IDALMSA-12051 causes the API to return "Skip Condition created successfully" when the API has actually updated instead of created. Low priority to fix as this doesn't break anything.
-     if not type(skip_logic_result) is str:
+     if not skip_logic_result is None and not type(skip_logic_result) is str:
         print("Skip Logic")
         print(skip_logic_result.to_markdown())
         skip_logic_result_failures = skip_logic_result[skip_logic_result['success'] != True] if not  type(skip_logic_result) is str else pd.DataFrame()
