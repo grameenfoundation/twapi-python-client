@@ -4,8 +4,9 @@ print(sys.argv[1])
 
 sourceDirectory = sys.argv[1]
 destDirectory = sys.argv[2]
+squishedPrefix = sys.argv[3]
 
-find_and_combine_translations(sourceDirectory,destDirectory)
+find_and_combine_translations(sourceDirectory,destDirectory,squishedPrefix)
 
 
 # Call With

@@ -9,6 +9,7 @@ import tabulate
 import re
 import random
 import json
+import numpy as np
 import string
 import html
 from datetime import datetime
@@ -124,7 +125,7 @@ def func_upload_questions_with_or_without_options(url_to_query,salesforce_servic
         if (upload_options_sanitized.empty):
             upload_options_sanitized['externalId'] = None
         else:
-            upload_options_sanitized['externalId'] = upload_options_sanitized.apply(lambda x: str(x['questionName'])[-8:] + str(x['position']) + re.sub( '(?<!^)(?=[A-Z])', '_', x['name'] ).lower()[-8:], axis=1) #Replace Capital Letters with "_(lowercase letter)" to prevent duplicates from salesforce IDs
+            upload_options_sanitized['externalId'] = upload_options_sanitized.sort_values(by=['questionName','name']).reset_index().index.astype(str)
         upload_options_sanitized = upload_options_sanitized[['name','position','caption','questionName','externalId']]
         upload_options_sanitized['caption'] = upload_options_sanitized['caption'].fillna("None")
     upload_questions_sanitized = upload_questions_without_options.copy().fillna("")

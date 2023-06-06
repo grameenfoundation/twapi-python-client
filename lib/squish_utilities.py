@@ -4,7 +4,7 @@ import pandas as pd
 import xlsxwriter
 import shutil
 
-def find_and_combine_translations(source_folder, destination_folder):
+def find_and_combine_translations(source_folder, destination_folder, squished_form_prefix):
     # Define the language codes to check for
     LANGUAGES = ['en', 'es', 'fr']
     # Create a dictionary to hold files with the same name
@@ -26,16 +26,16 @@ def find_and_combine_translations(source_folder, destination_folder):
                 file_dict[base_name] = [file_name]
     # Iterate through the files with translations and call the "squishFiles" function
     for name, files in file_dict.items():
-        if len(files) > 1:
+        #if len(files) > 1:
             print(files)
-            squishFiles(files, source_folder, destination_folder)
+            squishFiles(files, source_folder, destination_folder,squished_form_prefix)
         #otherwise just copy the file
-        else:
-            shutil.copyfile(os.path.join(source_folder,files[0]), os.path.join(destination_folder,files[0]))
+        #else:
+        #    shutil.copyfile(os.path.join(source_folder,files[0]), os.path.join(destination_folder, squished_form_prefix + files[0]))
 
-def squishFiles(files, source_folder, destination_folder):
+def squishFiles(files, source_folder, destination_folder,squished_form_prefix):
     base_name = files[0].split('_')[0]
-    squished_file_name = f"{base_name}_squished.xlsx"
+    squished_file_name = f"{squished_form_prefix}{base_name}_squished.xlsx"
 
     error_output = pd.DataFrame()
     
@@ -84,7 +84,13 @@ def squishFiles(files, source_folder, destination_folder):
                     new_name = column
                     if ('::' in column):
                         new_name = column.split('::')[0] + "::" + language
-                        language_specific_data[new_name] = sheet_data[column]
+
+                        # Add the prefix if desired (only for form name/alias)
+                        if ((squished_form_prefix != '') and (sheet == 'Forms' and (column.split('::')[0] == 'name') or (column.split('::')[0] == 'alias'))):
+                            language_specific_data[new_name] = squished_form_prefix + sheet_data[column]
+                        else:
+                            language_specific_data[new_name] = sheet_data[column]
+
                     else:
                         language_not_important_data[new_name] = sheet_data[column]
                     
