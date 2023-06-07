@@ -26,12 +26,8 @@ def find_and_combine_translations(source_folder, destination_folder, squished_fo
                 file_dict[base_name] = [file_name]
     # Iterate through the files with translations and call the "squishFiles" function
     for name, files in file_dict.items():
-        #if len(files) > 1:
             print(files)
             squishFiles(files, source_folder, destination_folder,squished_form_prefix)
-        #otherwise just copy the file
-        #else:
-        #    shutil.copyfile(os.path.join(source_folder,files[0]), os.path.join(destination_folder, squished_form_prefix + files[0]))
 
 def squishFiles(files, source_folder, destination_folder,squished_form_prefix):
     base_name = files[0].split('_')[0]

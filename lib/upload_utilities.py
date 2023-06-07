@@ -77,7 +77,6 @@ def func_upload_form(url_to_query,salesforce_service_url,auth_header,upload_form
 
         #This will only upload 1 form
         upload_str = str(upload_form_dataframe_relevant_columns.T.astype(str).to_json(force_ascii=False)).replace('{"0":','{"records":[')[:-2] + ',' + formVersionString + '}]}'
-        #print(upload_str)
         form_update_endpoint = salesforce_service_url + 'formdata/v1?objectType=PutFormData'
         form_result = upload_payload_to_url(url_to_query,salesforce_service_url,auth_header,form_update_endpoint, upload_str)
         return form_result, form_name_to_upload
@@ -158,9 +157,7 @@ def func_upload_questions_with_or_without_options(url_to_query,salesforce_servic
                 for questionName in options_associated_with_questions.items():
                     thisQuestionName = questionName[1]
                     upload_options_json = str(upload_options_sanitized[upload_options_sanitized['questionName'] == thisQuestionName][['externalId','id','name','position','caption']].to_json(orient='records',force_ascii=False))
-                    #print(upload_options_json)
                     row_index = upload_questions_with_options.index[upload_questions_with_options['name'] == thisQuestionName ].tolist()[0]
-                    #print(row_index)
                     upload_questions_with_options.at[row_index,'options']= json.loads(upload_options_json)
 
         upload_questions_with_options = upload_questions_with_options.merge( \
@@ -170,13 +167,6 @@ def func_upload_questions_with_or_without_options(url_to_query,salesforce_servic
 
     #Replace double quotes with single quotes just for dynamic ops, captions and hints - most of the time this will be fine
     upload_questions_with_options['dynamicOperation'] = upload_questions_with_options['dynamicOperation'].apply(html.escape)
-    # upload_questions_with_options.dynamicOperation = upload_questions_with_options.dynamicOperation.str.replace('\n','&#10;').replace('\t','&#9').replace('"','&#34;').replace("'",'&#39;')
-    #upload_questions_with_options['caption'] = upload_questions_with_options['caption'].apply(html.escape)
-    # upload_questions_with_options.caption = upload_questions_with_options.caption.str.replace('\n','&#10;').replace('\t','&#9').replace('"','”').replace("'",'’')
-    # upload_questions_with_options.caption = upload_questions_with_options.caption.str.slice(0,254)
-    #upload_questions_with_options['hint'] = upload_questions_with_options['hint'].apply(html.escape)
-    # upload_questions_with_options.hint = upload_questions_with_options.hint.str.replace('\n','&#10;').replace('\t','&#9').replace('"','”').replace("'",'’')
-    # upload_questions_with_options.hint = upload_questions_with_options.hint.str.slice(0,254)
     
 
     just_parent_sections = upload_questions_with_options[(upload_questions_without_options['type'] == 'section') | (upload_questions_without_options['type'] == 'repeat') ].reindex()
@@ -233,7 +223,6 @@ def func_upload_questions_with_or_without_options(url_to_query,salesforce_servic
             'changeLogNumber']].iloc[minimum:maximum].to_json(orient="records",force_ascii=False))\
             .replace("\\'","'").replace(',"options":""',',"options":[]')\
             .replace('"maximum":"",','').replace('"minimum":"",','').replace('"responseValidation":"",','').replace('"exampleOfValidResponse":"",','') + '}'
-            # question_with_options_creation_string
         questions_temp_result =  upload_payload_to_url(url_to_query,salesforce_service_url,auth_header,salesforce_service_url + 'questiondata/v1?objectType=PutQuestionData', question_with_options_creation_string)
         
         if (questions_result is None):
@@ -283,8 +272,6 @@ def func_read_existing_field_and_form_mappings(url_to_query,salesforce_service_u
         #Iterate all form mappings that have question mappings and create a new dataframe that has just the question mappings
         question_mapping_dataframe = pd.DataFrame(columns=["externalId", "name", "id", "fieldAPIName","isBroken","question","scoringGroup"])
         for index, frame in field_mapping_dataframe.iterrows():
-            # if (frame.questionMappings):
-            #     print(str(frame.questionMappings).replace('\'','"'))
             field_mapping_id = frame.id
             #JSON is case-sensitive, python apparently converts it into uppercase
             individual_question_mapping_df = pd.DataFrame(frame.questionMappings) 
@@ -319,11 +306,8 @@ def func_upload_field_and_form_mappings(url_to_query,salesforce_service_url,auth
         if (not question_mapping_associated_with_field_mapping.empty):
             for field_mapping_name in question_mapping_associated_with_field_mapping.items():
                 thisFieldMapping = field_mapping_name[1]
-                # print(thisFieldMapping)
                 upload_question_mapping_json = str(upload_question_mapping_with_ids[upload_question_mapping_with_ids['fieldMappingName'] == thisFieldMapping][['externalId', 'name', 'id', 'fieldAPIName', 'isBroken','question', 'scoringGroup']].to_json(orient='records',force_ascii=False))
-                # print(upload_question_mapping_json)
                 row_index = upload_field_mapping_with_question_mapping.index[upload_field_mapping_with_question_mapping['name'] == thisFieldMapping ].tolist()[0]
-                # print(row_index)
                 upload_field_mapping_with_question_mapping.at[row_index,'questionMappings']= upload_question_mapping_json
 
         upload_field_mapping_with_question_mapping['form'] = form_id
@@ -340,7 +324,6 @@ def func_upload_field_and_form_mappings(url_to_query,salesforce_service_url,auth
             'isReference', 'matchingField', 'repeat', 
             'submissionAPIField', 'changeLogNumber', 'questionMappings']].astype(str).to_json(orient="records",force_ascii=False)).replace('\\','')\
             .replace('"[{"','[{"').replace(']"}',']}') + "}"
-        # print(upload_field_mapping_string)
 
         if (upload_field_mapping_with_question_mapping.empty):
             form_mapping_result = "No Form Mapping to upload"

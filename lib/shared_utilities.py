@@ -8,9 +8,6 @@ def get_oauth_token_from_login(url_to_query, client_id, client_secret, username,
     conn = http.client.HTTPSConnection(url_to_query)
     payload = ''
     headers = {}
-    #NOTE: This is bad security practice, normally we would want these login details to be hidden so they don't get backed up to git
-    #For simplicity of this demo, we're exposing details here
-    #TODO: before production usage, separate these variables into a JSON file that's loaded from Google Drive
     login_url = "/services/oauth2/token?grant_type=password&client_id=" + client_id + "&client_secret=" + client_secret + "&username=" + username + "&password=" + password
     conn.request("POST",  login_url, payload, headers)
     res = conn.getresponse()

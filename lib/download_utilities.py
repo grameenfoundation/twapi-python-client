@@ -80,7 +80,6 @@ def get_all_dataframes_and_write_to_excel_from_form_name(url_to_query,salesforce
     questions_id_lookup = questions_without_options_id_replaced[['id','name']].rename(columns={'name':'questionName','id':'questionId'})
     questions_without_options_id_replaced = questions_without_options_id_replaced.merge(questions_id_lookup,how="left",left_on="parent",right_on="questionId").rename(columns={'questionName':'parentName'})
     #remove taroId column, just use name for this
-    #questions_without_options_id_replaced['taroId'] = questions_without_options_id_replaced.apply(lambda x: str(x['externalId']) if x['externalId'] else x['name'], axis=1)
     questions_without_options_id_replaced.drop(columns=['externalId'],inplace=True)
     questions_without_options_id_replaced = questions_without_options_id_replaced.drop(columns=['id','changeLogNumber','form','formVersion','questionId','parent'])
     #Merge on repeatSource
@@ -89,22 +88,12 @@ def get_all_dataframes_and_write_to_excel_from_form_name(url_to_query,salesforce
     options_dataframe_id_replaced = options_dataframe.copy()
     
     options_dataframe_id_replaced = options_dataframe_id_replaced.merge(questions_id_lookup,how='left',on='questionId')
-    #remove taroId column, just use name for this
-    # if (not options_dataframe_id_replaced.empty):
-    #     options_dataframe_id_replaced['taroId'] = options_dataframe_id_replaced.apply(lambda x: str(x['externalId']) if x['externalId'] else x['name'], axis=1)
-    # else:
-    #     options_dataframe_id_replaced['taroId'] = None
     options_dataframe_id_replaced.drop(columns=['externalId'],inplace=True)
     options_dataframe_id_replaced = options_dataframe_id_replaced.drop(columns=['id','questionId'])
     options_dataframe_id_replaced = options_dataframe_id_replaced.sort_values(by=["questionName","position"])
     field_mapping_without_questions_id_replaced = field_mapping_without_questions.copy()
     field_mapping_without_questions_id_replaced = field_mapping_without_questions_id_replaced.merge(questions_id_lookup,how="left",left_on="repeat",right_on="questionId")
     field_mapping_id_lookup = field_mapping_without_questions_id_replaced[['id','name']].rename(columns={'id':'fieldMappingId','name':'fieldMappingName'})
-    #remove taroId column, just use name for this
-    # if (not field_mapping_without_questions_id_replaced.empty):
-    #     field_mapping_without_questions_id_replaced['taroId'] = field_mapping_without_questions_id_replaced.apply(lambda x: str(x['externalId']) if x['externalId'] else x['name'], axis=1)
-    # else:
-    #     field_mapping_without_questions_id_replaced['taroId'] = None
     field_mapping_without_questions_id_replaced.drop(columns=['externalId'],inplace=True)
     field_mapping_without_questions_id_replaced = field_mapping_without_questions_id_replaced.drop(columns=['id','form','formVersion','changeLogNumber','repeat','questionId'])
     field_mapping_without_questions_id_replaced = field_mapping_without_questions_id_replaced.rename(columns={'questionName':'repeatQuestionName'}).fillna('').sort_values(by=['objectApiName'])
@@ -112,11 +101,6 @@ def get_all_dataframes_and_write_to_excel_from_form_name(url_to_query,salesforce
     question_mapping_dataframe_id_replaced = question_mapping_dataframe_id_replaced.merge(field_mapping_id_lookup,how="left",left_on="field_mapping_id",right_on="fieldMappingId")
     question_mapping_dataframe_id_replaced = question_mapping_dataframe_id_replaced.merge(questions_id_lookup,left_on='question',right_on = 'questionId')
     question_mapping_dataframe_id_replaced = question_mapping_dataframe_id_replaced.sort_values(by=['questionName','fieldMappingName'])
-    #remove taroId column, just use name for this
-    # if (not question_mapping_dataframe_id_replaced.empty):
-    #     question_mapping_dataframe_id_replaced['taroId'] = question_mapping_dataframe_id_replaced.apply(lambda x: str(x['externalId']) if x['externalId'] else x['name'], axis=1)
-    # else:
-    #     question_mapping_dataframe_id_replaced['taroId'] = None
     question_mapping_dataframe_id_replaced.drop(columns=['externalId'],inplace=True)
     question_mapping_dataframe_id_replaced = question_mapping_dataframe_id_replaced.drop(columns=['id','question','fieldMappingId','field_mapping_id','questionId'])
     skip_logic_dataframe_id_replaced = skip_logic_dataframe.copy()
@@ -142,11 +126,6 @@ def get_all_dataframes_and_write_to_excel_from_form_name(url_to_query,salesforce
     orm_dataframe_id_replaced = orm_dataframe_id_replaced.merge(field_mapping_id_lookup.rename(columns={'fieldMappingName':'parentSurveyName'}),how='left',left_on='parentSurveyMapping',right_on='fieldMappingId').drop(columns=['fieldMappingId'])
     orm_dataframe_id_replaced = orm_dataframe_id_replaced.merge(field_mapping_id_lookup.rename(columns={'fieldMappingName':'childSurveyName'}),how='left',left_on='childSurveyMapping',right_on='fieldMappingId').drop(columns=['fieldMappingId'])
     orm_dataframe_id_replaced = orm_dataframe_id_replaced.sort_values(by=['fieldApiName','parentSurveyName','childSurveyName'])
-    #remove taroId column, just use name for this
-    # if (not orm_dataframe_id_replaced.empty):
-    #     orm_dataframe_id_replaced['taroId'] = orm_dataframe_id_replaced.apply(lambda x: str(x['externalId']) if x['externalId'] else x['name'], axis=1)
-    # else: 
-    #   orm_dataframe_id_replaced['taroId'] = None
     orm_dataframe_id_replaced.drop(columns=['externalId'],inplace=True)
     orm_dataframe_id_replaced = orm_dataframe_id_replaced.drop(columns=['id','parentSurveyMapping','childSurveyMapping','formVersion','changeLogNumber'])
 
@@ -177,15 +156,6 @@ def get_all_dataframes_and_write_to_excel_from_form_name(url_to_query,salesforce
     workbook=writer.book
 
     # https://datascience.stackexchange.com/questions/46437/how-to-write-multiple-data-frames-in-an-excel-sheet
-    # form_dataframe
-    # questions_without_options
-    # options_dataframe
-    # question_mapping_dataframe
-    # field_mapping_without_questions
-    # skip_logic_dataframe
-    # orm_dataframe
-
-    # Replace double quote character with safe quote in all columns
     form_dataframe_id_replaced.to_excel(writer,sheet_name='Forms', startcol=0,index=False)
     questions_without_options_id_replaced.to_excel(writer,sheet_name='Questions', startcol=0,index=False)
     options_dataframe_id_replaced.to_excel(writer,sheet_name='Options', startcol=0,index=False)
