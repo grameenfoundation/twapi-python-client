@@ -107,10 +107,11 @@ def get_all_dataframes_and_write_to_excel_from_form_name(url_to_query,salesforce
     #     field_mapping_without_questions_id_replaced['taroId'] = None
     field_mapping_without_questions_id_replaced.drop(columns=['externalId'],inplace=True)
     field_mapping_without_questions_id_replaced = field_mapping_without_questions_id_replaced.drop(columns=['id','form','formVersion','changeLogNumber','repeat','questionId'])
-    field_mapping_without_questions_id_replaced = field_mapping_without_questions_id_replaced.rename(columns={'questionName':'repeatQuestionName'}).fillna('')
+    field_mapping_without_questions_id_replaced = field_mapping_without_questions_id_replaced.rename(columns={'questionName':'repeatQuestionName'}).fillna('').sort_values(by=['objectApiName'])
     question_mapping_dataframe_id_replaced = question_mapping_dataframe.copy()
     question_mapping_dataframe_id_replaced = question_mapping_dataframe_id_replaced.merge(field_mapping_id_lookup,how="left",left_on="field_mapping_id",right_on="fieldMappingId")
     question_mapping_dataframe_id_replaced = question_mapping_dataframe_id_replaced.merge(questions_id_lookup,left_on='question',right_on = 'questionId')
+    question_mapping_dataframe_id_replaced = question_mapping_dataframe_id_replaced.sort_values(by=['questionName','fieldMappingName'])
     #remove taroId column, just use name for this
     # if (not question_mapping_dataframe_id_replaced.empty):
     #     question_mapping_dataframe_id_replaced['taroId'] = question_mapping_dataframe_id_replaced.apply(lambda x: str(x['externalId']) if x['externalId'] else x['name'], axis=1)
@@ -122,6 +123,7 @@ def get_all_dataframes_and_write_to_excel_from_form_name(url_to_query,salesforce
     skip_logic_dataframe_id_replaced = skip_logic_dataframe_id_replaced.merge(questions_id_lookup,left_on='sourceQuestion',right_on='questionId').rename(columns={'questionName':'sourceQuestionName'}).drop(columns=['questionId'])
 
     skip_logic_dataframe_id_replaced = skip_logic_dataframe_id_replaced.merge(questions_id_lookup,left_on='parentQuestion',right_on='questionId').rename(columns={'questionName':'parentQuestionName'}).drop(columns=['questionId'])
+    skip_logic_dataframe_id_replaced = skip_logic_dataframe_id_replaced.sort_values(by=['parentQuestion','sourceQuestion'])
     #create a fictitious name column (external ID if it exists, join column if not)
     if (not skip_logic_dataframe_id_replaced.empty):
         skip_logic_dataframe_id_replaced['name'] = skip_logic_dataframe_id_replaced.apply(lambda x: str(x['externalId']) if x['externalId'] else str(x['sourceQuestion']) + str(x['parentQuestion']), axis=1)
@@ -139,6 +141,7 @@ def get_all_dataframes_and_write_to_excel_from_form_name(url_to_query,salesforce
     orm_dataframe_id_replaced = orm_dataframe.copy()
     orm_dataframe_id_replaced = orm_dataframe_id_replaced.merge(field_mapping_id_lookup.rename(columns={'fieldMappingName':'parentSurveyName'}),how='left',left_on='parentSurveyMapping',right_on='fieldMappingId').drop(columns=['fieldMappingId'])
     orm_dataframe_id_replaced = orm_dataframe_id_replaced.merge(field_mapping_id_lookup.rename(columns={'fieldMappingName':'childSurveyName'}),how='left',left_on='childSurveyMapping',right_on='fieldMappingId').drop(columns=['fieldMappingId'])
+    orm_dataframe_id_replaced = orm_dataframe_id_replaced.sort_values(by=['fieldApiName','parentSurveyName','childSurveyName'])
     #remove taroId column, just use name for this
     # if (not orm_dataframe_id_replaced.empty):
     #     orm_dataframe_id_replaced['taroId'] = orm_dataframe_id_replaced.apply(lambda x: str(x['externalId']) if x['externalId'] else x['name'], axis=1)
